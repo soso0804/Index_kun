@@ -13,7 +13,7 @@
     const queryString = window.location.search; // URLのクエリパラメータ
     const urlParams = new URLSearchParams(queryString);
     const userName = urlParams.get('userName'); // userNameの取得
-    const apiUrl = "https://script.google.com/macros/s/AKfycbw5aVOciqF3N_UnzH7b9It5Uj6nvw5KiqsuoGSUQCw6_zI6GEQRHOJyti8ZmTS92k8X/exec?action=getUserPortfolio&userName=" + userName;
+    const apiUrl = "https://script.google.com/macros/s/AKfycbwwZFOwBiNptY2xs0sL9w43E91LK1iLdZNAT9PrWrV_wyL8_UWh3XJwhZgQ7LXdi-eQ/exec?action=getUserPortfolio&userName=" + userName;
 
     fetch(apiUrl)
       .then(response => response.json())
