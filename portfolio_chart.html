@@ -8,8 +8,8 @@
   <style>
     /* グラフのサイズを調整 */
     canvas {
-      max-width: 300px;
-      max-height: 300px;
+      max-width: 250px; /* サイズを小さく調整 */
+      max-height: 250px;
       margin: auto;
       display: block;
     }
@@ -67,7 +67,7 @@
                 maintainAspectRatio: false, // キャンバスサイズをカスタマイズ可能に
                 plugins: {
                   legend: {
-                    position: 'top',
+                    position: 'bottom', // 凡例を下に配置
                   }
                 }
               }
@@ -84,7 +84,5 @@
     }
   </script>
 </body>
-</html>
-
 </html>
 
