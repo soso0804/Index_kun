@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio Chart</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* 全体レイアウト調整 */
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      height: 100vh; /* 全体を画面サイズに合わせる */
+      box-sizing: border-box;
+    }
+
+    #chart-container {
+      width: 90%; /* 横幅の余白を持たせる */
+      max-width: 400px; /* 最大幅を設定 */
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="chart-container">
+    <canvas id="portfolioChart"></canvas>
+  </div>
+  <script>
+    // ユーザーのデータをAPIから取得
+    const queryString = window.location.search; // URLのクエリパラメータ
+    const urlParams = new URLSearchParams(queryString);
+    const userName = urlParams.get('userName'); // userNameの取得
+    const apiUrl = "https://script.google.com/macros/s/AKfycbw8ivxsRZLKEN2nkcBYSArSVMOuzhczkCibueCU3ROtjszdqQbRlY6IeZn8aNnNjRR4/exec?action=getUserPortfolio&userName=" + userName;
+
+    if (!userName) {
+      document.body.innerHTML = "<p>Error: No userName provided in the URL. Please add ?userName=your-email@example.com to the URL.</p>";
+      console.error("Error: No userName provided in the URL.");
+    } else {
+      fetch(apiUrl)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.status === "success") {
+            let portfolioData = data.data;
+
+            // totalStockの多い順にソート
+            portfolioData = portfolioData.sort((a, b) => b.totalStock - a.totalStock);
+
+            // ソートされたデータからラベルと値を抽出
+            const labels = portfolioData.map(item => item.companyName);
+            const stockValues = portfolioData.map(item => parseInt(item.totalStock, 10));
+
+            // グラフを描画
+            const ctx = document.getElementById('portfolioChart').getContext('2d');
+            new Chart(ctx, {
+              type: 'pie',
+              data: {
+                labels: labels,
+                datasets: [{
+                  label: 'Portfolio',
+                  data: stockValues,
+                  backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40',
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'
+                  ],
+                  borderWidth: 1
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false, // キャンバスのアスペクト比をカスタマイズ可能に
+                plugins: {
+                  legend: {
+                    position: 'bottom', // 凡例を下に配置
+                    labels: {
+                      font: {
+                        size: 12 // 凡例の文字サイズを調整
+                      }
+                    }
+                  }
+                }
+              }
+            });
+          } else {
+            document.body.innerHTML = `<p>Error: ${data.message}</p>`;
+            console.error("API Error:", data.message);
+          }
+        })
+        .catch(error => {
+          document.body.innerHTML = `<p>Error fetching data: ${error.message}</p>`;
+          console.error("Error fetching data:", error);
+        });
+    }
+  </script>
+</body>
+</html>
