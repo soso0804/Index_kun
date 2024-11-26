@@ -6,17 +6,27 @@
   <title>Portfolio Chart</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    /* グラフのサイズを調整 */
-    canvas {
-      max-width: 2000px; /* サイズを小さく調整 */
-      max-height: 2000px;
+    /* 全体レイアウト調整 */
+    #chart-container {
+      width: 70%; /* 画面の70%幅に調整 */
+      max-width: 800px; /* 最大幅800px */
       margin: auto;
-      display: block;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    canvas {
+      width: 100%; /* コンテナ内でフルサイズに対応 */
+      max-width: 700px; /* 最大幅700pxで制限 */
+      height: auto; /* 高さを自動調整 */
     }
   </style>
 </head>
 <body>
-  <canvas id="portfolioChart"></canvas>
+  <div id="chart-container">
+    <canvas id="portfolioChart"></canvas>
+  </div>
   <script>
     // ユーザーのデータをAPIから取得
     const queryString = window.location.search; // URLのクエリパラメータ
@@ -64,10 +74,15 @@
               },
               options: {
                 responsive: true,
-                maintainAspectRatio: false, // キャンバスサイズをカスタマイズ可能に
+                maintainAspectRatio: false, // キャンバスのアスペクト比をカスタマイズ
                 plugins: {
                   legend: {
                     position: 'bottom', // 凡例を下に配置
+                    labels: {
+                      font: {
+                        size: 14 // 凡例の文字サイズを大きく調整
+                      }
+                    }
                   }
                 }
               }
@@ -85,4 +100,5 @@
   </script>
 </body>
 </html>
+
 
