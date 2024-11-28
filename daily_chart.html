@@ -16,17 +16,20 @@
       align-items: center;
       flex-direction: column;
       height: 100vh;
-      background-color: #f4f4f4;
+      background-color: #f8f9fa;
     }
     canvas {
-      max-width: 800px;
+      max-width: 900px;
       width: 100%;
       height: 600px;
+    }
+    h1 {
+      color: #343a40;
     }
   </style>
 </head>
 <body>
-  <h1>企業の株価ローソク足チャート</h1>
+  <h1>PORT（カフェ）の株価ローソク足チャート</h1>
   <canvas id="candlestickChart"></canvas>
   <script>
     const queryString = window.location.search;
@@ -41,13 +44,41 @@
       .then(response => response.json())
       .then(data => {
         if (data.status === "success") {
-          const candlestickData = data.data.map(item => ({
-            x: new Date(item.date), // 日付をDateオブジェクトに変換
-            o: item.open, // 始値
-            h: item.high, // 高値
-            l: item.low,  // 安値
-            c: item.close // 終値
-          }));
+          const rawData = data.data;
+
+          // 日付が抜けている部分を埋める
+          const completeData = [];
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          let currentDate = new Date(start);
+
+          while (currentDate <= end) {
+            const formattedDate = currentDate.toISOString().split("T")[0];
+            const existing = rawData.find(item => item.date === formattedDate);
+
+            if (existing) {
+              completeData.push({
+                x: new Date(existing.date),
+                o: existing.open,
+                h: existing.high,
+                l: existing.low,
+                c: existing.close,
+              });
+            } else {
+              // 前日の終値を継続するデータを作成
+              const prev = completeData[completeData.length - 1];
+              if (prev) {
+                completeData.push({
+                  x: new Date(formattedDate),
+                  o: prev.c,
+                  h: prev.c,
+                  l: prev.c,
+                  c: prev.c,
+                });
+              }
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
 
           const ctx = document.getElementById("candlestickChart").getContext("2d");
           new Chart(ctx, {
@@ -55,12 +86,13 @@
             data: {
               datasets: [{
                 label: `${companyName} 株価`,
-                data: candlestickData,
+                data: completeData,
                 color: {
-                  up: "#3cba54",   // 上昇時の色
-                  down: "#ff4444", // 下落時の色
-                  unchanged: "#f4c20d"
-                }
+                  up: "#26a69a",
+                  down: "#ef5350",
+                  unchanged: "#ffa726"
+                },
+                borderWidth: 1
               }]
             },
             options: {
@@ -70,23 +102,46 @@
                 x: {
                   type: "time",
                   time: {
-                    unit: "day"
+                    unit: "day",
+                    tooltipFormat: "yyyy-MM-dd"
                   },
                   title: {
                     display: true,
-                    text: "日付"
+                    text: "日付",
+                    color: "#333"
+                  },
+                  grid: {
+                    color: "#e0e0e0"
                   }
                 },
                 y: {
                   title: {
                     display: true,
-                    text: "株価 (円)"
+                    text: "株価 (円)",
+                    color: "#333"
+                  },
+                  grid: {
+                    color: "#e0e0e0"
                   }
                 }
               },
               plugins: {
                 legend: {
-                  position: "top"
+                  position: "top",
+                  labels: {
+                    font: {
+                      size: 12
+                    },
+                    color: "#333"
+                  }
+                },
+                tooltip: {
+                  callbacks: {
+                    label: (context) => {
+                      const ohlc = context.raw;
+                      return `開: ${ohlc.o} 高: ${ohlc.h} 安: ${ohlc.l} 終: ${ohlc.c}`;
+                    }
+                  }
                 }
               }
             }
@@ -101,4 +156,3 @@
   </script>
 </body>
 </html>
-
