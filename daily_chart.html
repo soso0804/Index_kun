@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Candlestick Chart</title>
+  <title>株価変動チャート</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
@@ -15,21 +15,25 @@
       justify-content: center;
       align-items: center;
       flex-direction: column;
-      height: 100vh;
       background-color: #f8f9fa;
-    }
-    canvas {
-      max-width: 900px;
-      width: 100%;
-      height: 600px;
+      height: 100vh;
+      font-family: Arial, sans-serif;
     }
     h1 {
+      font-size: 1.5rem;
       color: #343a40;
+      margin: 10px 0;
+      text-align: center;
+    }
+    canvas {
+      max-width: 90%;
+      width: 100%;
+      height: 80%;
     }
   </style>
 </head>
 <body>
-  <h1>PORT（カフェ）の株価ローソク足チャート</h1>
+  <h1 id="chartTitle"></h1>
   <canvas id="candlestickChart"></canvas>
   <script>
     const queryString = window.location.search;
@@ -37,6 +41,14 @@
     const companyName = urlParams.get("companyName");
     const startDate = urlParams.get("startDate");
     const endDate = urlParams.get("endDate");
+
+    // 動的にタイトルを設定
+    const titleElement = document.getElementById("chartTitle");
+    if (companyName) {
+      titleElement.textContent = `${companyName}の株価変動チャート`;
+    } else {
+      titleElement.textContent = "株価変動チャート";
+    }
 
     const apiUrl = `https://script.google.com/macros/s/AKfycbwk0zNt_5_y4jOkNoGHDx_1raOeF4zpUlej2OisH773pAe0Bpu7RC5cqupn50h3fRGt/exec?action=getStockPriceByCompany&companyName=${companyName}&startDate=${startDate}&endDate=${endDate}`;
 
@@ -102,8 +114,11 @@
                 x: {
                   type: "time",
                   time: {
-                    unit: "day",
-                    tooltipFormat: "yyyy-MM-dd"
+                    unit: "day", // 日単位で表示
+                    stepSize: 1, // 毎日を表示
+                    displayFormats: {
+                      day: "MMM dd", // 月 日のフォーマット
+                    },
                   },
                   title: {
                     display: true,
@@ -112,6 +127,9 @@
                   },
                   grid: {
                     color: "#e0e0e0"
+                  },
+                  ticks: {
+                    maxTicksLimit: 10 // 横軸の目盛りを適度に制限
                   }
                 },
                 y: {
