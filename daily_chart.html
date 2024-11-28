@@ -6,6 +6,7 @@
   <title>Candlestick Chart</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script> <!-- Date Adapter -->
   <style>
     body {
       margin: 0;
@@ -65,9 +66,14 @@
               responsive: true,
               scales: {
                 x: {
-                  type: "time",
+                  type: "time", // 時間スケール
                   time: {
                     unit: "day"
+                  },
+                  adapters: {
+                    date: {
+                      locale: "ja-JP" // 必要に応じてロケールを変更
+                    }
                   },
                   title: {
                     display: true,
@@ -98,3 +104,4 @@
   </script>
 </body>
 </html>
+
