@@ -6,7 +6,8 @@
   <title>Candlestick Chart</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script> <!-- Date Adapter -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <script src="https://cdn.jsdelivr.net/npm/date-fns"></script>
   <style>
     body {
       margin: 0;
@@ -20,6 +21,7 @@
     canvas {
       max-width: 800px;
       width: 100%;
+      height: 600px;
     }
   </style>
 </head>
@@ -27,30 +29,26 @@
   <h1>企業の株価ローソク足チャート</h1>
   <canvas id="candlestickChart"></canvas>
   <script>
-    // URLクエリパラメータから値を取得
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     const companyName = urlParams.get("companyName");
     const startDate = urlParams.get("startDate");
     const endDate = urlParams.get("endDate");
 
-    // API URLを構築
     const apiUrl = `https://script.google.com/macros/s/AKfycbwk0zNt_5_y4jOkNoGHDx_1raOeF4zpUlej2OisH773pAe0Bpu7RC5cqupn50h3fRGt/exec?action=getStockPriceByCompany&companyName=${companyName}&startDate=${startDate}&endDate=${endDate}`;
 
-    // データを取得してローソク足チャートを描画
     fetch(apiUrl)
       .then(response => response.json())
       .then(data => {
         if (data.status === "success") {
           const candlestickData = data.data.map(item => ({
-            x: item.date, // 日付
+            x: new Date(item.date), // 日付をDateオブジェクトに変換
             o: item.open, // 始値
             h: item.high, // 高値
             l: item.low,  // 安値
             c: item.close // 終値
           }));
 
-          // Chart.jsの設定
           const ctx = document.getElementById("candlestickChart").getContext("2d");
           new Chart(ctx, {
             type: "candlestick",
@@ -58,22 +56,21 @@
               datasets: [{
                 label: `${companyName} 株価`,
                 data: candlestickData,
-                borderColor: "#36A2EB",
-                backgroundColor: "rgba(54,162,235,0.2)"
+                color: {
+                  up: "#3cba54",   // 上昇時の色
+                  down: "#ff4444", // 下落時の色
+                  unchanged: "#f4c20d"
+                }
               }]
             },
             options: {
               responsive: true,
+              maintainAspectRatio: false,
               scales: {
                 x: {
-                  type: "time", // 時間スケール
+                  type: "time",
                   time: {
                     unit: "day"
-                  },
-                  adapters: {
-                    date: {
-                      locale: "ja-JP" // 必要に応じてロケールを変更
-                    }
                   },
                   title: {
                     display: true,
@@ -103,7 +100,5 @@
       });
   </script>
 </body>
-</html>
-
 </html>
 
