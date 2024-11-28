@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Candlestick Chart</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      height: 100vh;
+      background-color: #f4f4f4;
+    }
+    canvas {
+      max-width: 800px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h1>企業の株価ローソク足チャート</h1>
+  <canvas id="candlestickChart"></canvas>
+  <script>
+    // URLクエリパラメータから値を取得
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    const companyName = urlParams.get("companyName");
+    const startDate = urlParams.get("startDate");
+    const endDate = urlParams.get("endDate");
+
+    // API URLを構築
+    const apiUrl = `https://script.google.com/macros/s/デプロイID/exec?action=getStockPriceByCompany&companyName=${companyName}&startDate=${startDate}&endDate=${endDate}`;
+
+    // データを取得してローソク足チャートを描画
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === "success") {
+          const candlestickData = data.data.map(item => ({
+            x: item.date, // 日付
+            o: item.open, // 始値
+            h: item.high, // 高値
+            l: item.low,  // 安値
+            c: item.close // 終値
+          }));
+
+          // Chart.jsの設定
+          const ctx = document.getElementById("candlestickChart").getContext("2d");
+          new Chart(ctx, {
+            type: "candlestick",
+            data: {
+              datasets: [{
+                label: `${companyName} 株価`,
+                data: candlestickData,
+                borderColor: "#36A2EB",
+                backgroundColor: "rgba(54,162,235,0.2)"
+              }]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                x: {
+                  type: "time",
+                  time: {
+                    unit: "day"
+                  },
+                  title: {
+                    display: true,
+                    text: "日付"
+                  }
+                },
+                y: {
+                  title: {
+                    display: true,
+                    text: "株価 (円)"
+                  }
+                }
+              },
+              plugins: {
+                legend: {
+                  position: "top"
+                }
+              }
+            }
+          });
+        } else {
+          document.body.innerHTML = `<p>Error: ${data.message}</p>`;
+        }
+      })
+      .catch(error => {
+        document.body.innerHTML = `<p>Error fetching data: ${error.message}</p>`;
+      });
+  </script>
+</body>
+</html>
