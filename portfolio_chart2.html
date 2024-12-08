@@ -6,6 +6,9 @@
   <title>株価変動チャート</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial/dist/chartjs-chart-financial.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/moment-timezone@0.5.40/builds/moment-timezone-with-data.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -41,7 +44,6 @@
     const companyName = urlParams.get('companyName');
     const apiUrl = "https://script.google.com/macros/s/AKfycbxjSo_63v8Aht7MkkVJI3EaqWaW_bfbvwOi_mN7XzXkkyHEajq8uNNXhwx0MebYf_Aw/exec?action=getStockPriceByCompany&companyName=" + companyName;
 
-    // 企業名が指定されていない場合のエラーメッセージ
     if (!companyName) {
       document.body.innerHTML = "<p>Error: No companyName provided in the URL. Please add ?companyName=CompanyName to the URL.</p>";
       console.error("Error: No companyName provided in the URL.");
