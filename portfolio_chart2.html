@@ -57,6 +57,7 @@
           return response.json();
         })
         .then(data => {
+          console.log(data); // デバッグ用にデータを確認
           if (data.status === "success") {
             const stockData = data.data;
 
