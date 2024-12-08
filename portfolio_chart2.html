@@ -1,25 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Portfolio Chart</title>
+  <title>株価変動チャート</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial/dist/chartjs-chart-financial.min.js"></script>
   <style>
-    /* 全体レイアウト調整 */
     body {
-      margin: 0;
+      font-family: Arial, sans-serif;
       display: flex;
-      justify-content: center;
-      align-items: center;
       flex-direction: column;
-      height: 100vh; /* 全体を画面サイズに合わせる */
-      box-sizing: border-box;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
     }
 
     #chart-container {
-      width: 90%; /* 横幅の余白を持たせる */
-      max-width: 400px; /* 最大幅を設定 */
+      width: 90%;
+      max-width: 800px;
+      margin-top: 20px;
     }
 
     canvas {
@@ -29,20 +30,23 @@
   </style>
 </head>
 <body>
+  <h1>株価変動チャート</h1>
   <div id="chart-container">
-    <canvas id="portfolioChart"></canvas>
+    <canvas id="stockChart"></canvas>
   </div>
   <script>
-    // ユーザーのデータをAPIから取得
-    const queryString = window.location.search; // URLのクエリパラメータ
+    // クエリパラメーターから企業名を取得
+    const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
-    const userName = urlParams.get('userName'); // userNameの取得
-    const apiUrl = "https://script.google.com/macros/s/AKfycbw8ivxsRZLKEN2nkcBYSArSVMOuzhczkCibueCU3ROtjszdqQbRlY6IeZn8aNnNjRR4/exec?action=getUserPortfolio&userName=" + userName;
+    const companyName = urlParams.get('companyName');
+    const apiUrl = "https://script.google.com/macros/s/AKfycbxjSo_63v8Aht7MkkVJI3EaqWaW_bfbvwOi_mN7XzXkkyHEajq8uNNXhwx0MebYf_Aw/exec?action=getStockPriceByCompany&companyName=" + companyName;
 
-    if (!userName) {
-      document.body.innerHTML = "<p>Error: No userName provided in the URL. Please add ?userName=your-email@example.com to the URL.</p>";
-      console.error("Error: No userName provided in the URL.");
+    // 企業名が指定されていない場合のエラーメッセージ
+    if (!companyName) {
+      document.body.innerHTML = "<p>Error: No companyName provided in the URL. Please add ?companyName=CompanyName to the URL.</p>";
+      console.error("Error: No companyName provided in the URL.");
     } else {
+      // APIからデータを取得
       fetch(apiUrl)
         .then(response => {
           if (!response.ok) {
@@ -52,55 +56,64 @@
         })
         .then(data => {
           if (data.status === "success") {
-            let portfolioData = data.data;
+            const stockData = data.data;
 
-            // totalStockの多い順にソート
-            portfolioData = portfolioData.sort((a, b) => b.totalStock - a.totalStock);
+            // データをChart.jsのフォーマットに変換
+            const chartData = stockData.map(item => ({
+              x: item.date,
+              o: item.open,
+              h: item.high,
+              l: item.low,
+              c: item.close
+            }));
 
-            // ソートされたデータからラベルと値を抽出
-            const labels = portfolioData.map(item => item.companyName);
-            const stockValues = portfolioData.map(item => parseInt(item.totalStock, 10));
-
-            // 多種類の背景色を設定
-            const backgroundColors = [
-              '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40',
-              '#E6B0AA', '#A9CCE3', '#F9E79F', '#76D7C4', '#BB8FCE', '#F1948A',
-              '#A3E4D7', '#85C1E9', '#F7DC6F', '#F5B7B1', '#D5DBDB', '#FAD7A0'
-            ];
-
-            // グラフを描画
-            const ctx = document.getElementById('portfolioChart').getContext('2d');
+            // Chart.jsでチャートを描画
+            const ctx = document.getElementById('stockChart').getContext('2d');
             new Chart(ctx, {
-              type: 'pie',
+              type: 'candlestick',
               data: {
-                labels: labels,
                 datasets: [{
-                  label: '持ち株数', // ツールチップに表示されるラベル
-                  data: stockValues,
-                  backgroundColor: backgroundColors,
+                  label: `${companyName} 株価チャート`,
+                  data: chartData,
+                  borderColor: '#333',
                   borderWidth: 1
                 }]
               },
               options: {
                 responsive: true,
-                maintainAspectRatio: false, // キャンバスのアスペクト比をカスタマイズ可能に
                 plugins: {
                   legend: {
-                    position: 'bottom', // 凡例を下に配置
-                    labels: {
-                      font: {
-                        size: 12 // 凡例の文字サイズを調整
-                      }
-                    }
+                    position: 'top'
                   },
                   tooltip: {
                     callbacks: {
-                      label: function(tooltipItem) {
-                        const dataIndex = tooltipItem.dataIndex;
-                        const stock = stockValues[dataIndex];
-                        const label = labels[dataIndex];
-                        return `持ち株数：${stock}株`; // ツールチップの内容を修正
+                      label: (context) => {
+                        const data = context.raw;
+                        return [
+                          `Open: ${data.o}`,
+                          `High: ${data.h}`,
+                          `Low: ${data.l}`,
+                          `Close: ${data.c}`
+                        ];
                       }
+                    }
+                  }
+                },
+                scales: {
+                  x: {
+                    type: 'time',
+                    time: {
+                      unit: 'day'
+                    },
+                    title: {
+                      display: true,
+                      text: 'Date'
+                    }
+                  },
+                  y: {
+                    title: {
+                      display: true,
+                      text: 'Price'
                     }
                   }
                 }
