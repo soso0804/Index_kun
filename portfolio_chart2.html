@@ -40,7 +40,7 @@
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     const companyName = urlParams.get('companyName');
-    const apiUrl = "https://script.google.com/macros/s/デプロイID/exec?action=getStockPriceByCompany&companyName=" + companyName;
+    const apiUrl = "https://script.google.com/macros/s/AKfycbyiBTNsJVWpbU2qG4UPfuyqfkenSioR9XKNzFRrc305LJd8wNCTLISv-VCwSdnr1ktv/exec?action=getStockPriceByCompany&companyName=" + companyName;
 
     if (!companyName) {
       document.body.innerHTML = "<p>Error: No companyName provided in the URL. Please add ?companyName=CompanyName to the URL.</p>";
