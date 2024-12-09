@@ -1,95 +1,88 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>株価変動チャート</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ろうそく足チャート</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #222;
+            color: white;
+        }
+    </style>
 </head>
 <body>
-  <h1 id="chart-title"></h1>
-  <canvas id="stockChart"></canvas>
-  <script>
-    // URLからクエリパラメータを取得
-    const queryString = window.location.search;
-    const urlParams = new URLSearchParams(queryString);
-    const companyName = urlParams.get('companyName');
-    const startDate = urlParams.get('startDate');
-    const endDate = urlParams.get('endDate');
+    <h1>ろうそく足チャート</h1>
+    <canvas id="candlestickChart" width="800" height="400"></canvas>
+    <script>
+        // 動的にデータを取得 (例: GitHub Pagesから`data.json`をロード)
+        fetch('data.json')
+            .then(response => response.json())
+            .then(data => {
+                const formattedData = data.map(item => ({
+                    x: item.date,
+                    o: item.open,
+                    h: item.high,
+                    l: item.low,
+                    c: item.close
+                }));
 
-    // API URLの作成
-    const apiUrl = `https://script.google.com/macros/s/AKfycbwk0zNt_5_y4jOkNoGHDx_1raOeF4zpUlej2OisH773pAe0Bpu7RC5cqupn50h3fRGt/exec?action=getStockPriceByCompany&companyName=${encodeURIComponent(companyName)}&startDate=${startDate}&endDate=${endDate}`;
-
-    // グラフの初期設定
-    const ctx = document.getElementById('stockChart').getContext('2d');
-    let chart;
-
-    // APIからデータを取得して描画
-    fetch(apiUrl)
-      .then(response => response.json())
-      .then(data => {
-        if (data.status === "success") {
-          const chartData = data.data;
-
-          // データを整理
-          const labels = chartData.map(item => item.date); // 日付
-          const stockPrices = chartData.map(item => item.close); // 終値
-
-          // グラフのタイトルを設定
-          document.getElementById('chart-title').innerText = `${companyName}の株価変動チャート`;
-
-          // グラフを描画
-          chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-              labels: labels,
-              datasets: [{
-                label: `${companyName} 株価`,
-                data: stockPrices,
-                borderColor: 'blue',
-                backgroundColor: 'rgba(173, 216, 230, 0.4)',
-                fill: true,
-                tension: 0.4 // 曲線を滑らかにする
-              }]
-            },
-            options: {
-              responsive: true,
-              plugins: {
-                legend: {
-                  display: true,
-                  position: 'top'
-                }
-              },
-              scales: {
-                x: {
-                  type: 'time', // 時間スケール
-                  time: {
-                    unit: 'day',
-                    tooltipFormat: 'yyyy-MM-dd' // ツールチップの日付形式
-                  },
-                  title: {
-                    display: true,
-                    text: '日付'
-                  }
-                },
-                y: {
-                  title: {
-                    display: true,
-                    text: '株価 (円)'
-                  },
-                  beginAtZero: false
-                }
-              }
-            }
-          });
-        } else {
-          document.body.innerHTML = `<p>Error: ${data.message}</p>`;
-        }
-      })
-      .catch(error => {
-        document.body.innerHTML = `<p>Error fetching data: ${error.message}</p>`;
-      });
-  </script>
+                const ctx = document.getElementById('candlestickChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'candlestick',
+                    data: {
+                        datasets: [{
+                            label: 'Stock Data',
+                            data: formattedData,
+                            borderColor: 'black',
+                            color: {
+                                up: '#26a69a',
+                                down: '#ef5350',
+                                unchanged: '#888'
+                            }
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: 'day',
+                                    tooltipFormat: 'YYYY-MM-DD'
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Date'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Price'
+                                }
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(error => console.error('Error loading data:', error));
+    </script>
 </body>
 </html>
