@@ -7,7 +7,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial/dist/chartjs-chart-financial.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/moment-timezone@0.5.40/builds/moment-timezone-with-data.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
   <style>
     body {
@@ -42,7 +41,7 @@
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     const companyName = urlParams.get('companyName');
-    const apiUrl = "https://script.google.com/macros/s/AKfycbxjSo_63v8Aht7MkkVJI3EaqWaW_bfbvwOi_mN7XzXkkyHEajq8uNNXhwx0MebYf_Aw/exec?action=getStockPriceByCompany&companyName=" + companyName;
+    const apiUrl = "https://script.googleusercontent.com/macros/echo?user_content_key=k9H6PkHpMdd_hUTx3sc_ZR3UIGg5GdaqEFbpNEMnxPScYenDzsXmFStsDmta7oAY9zdJYwl4z7Uf3Lwt3AEc3nTpFgM4UO78OJmA1Yb3SEsKFZqtv3DaNYcMrmhZHmUMWojr9NvTBuBLhyHCd5hHa9iZ2UrqsNGz5NG1wsGokvbjgMWki11QBVU-i_4JSvzKLqE9G6KaWWwpS_iHTI_qznpD1-pG9aQ66d09L5B6dufr9eGNRgEtOAtBHn44AOQPmqyykG4rweN-ikh8riXu6ey_2U42-toKyua8602ukhQfqZwicMi52xeRlp9bbpE7AGG_PsK_njA2DDULVXnOAJqUnIyoTUoHTgeEpawCANNi1YnhDb42Dg&lib=ME8d0Tfb6a7zUNaTeDZ1PNbABPh_Ti3Gl";
 
     if (!companyName) {
       document.body.innerHTML = "<p>Error: No companyName provided in the URL. Please add ?companyName=CompanyName to the URL.</p>";
@@ -50,13 +49,9 @@
     } else {
       // APIからデータを取得
       fetch(apiUrl)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-          }
-          return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
+          console.log(data); // デバッグ用にデータを確認
           if (data.status === "success") {
             const stockData = data.data;
 
@@ -112,7 +107,7 @@
                     time: {
                       unit: 'day',
                       displayFormats: {
-                        day: 'MMM DD, HH:mm' // 日付と時刻を表示
+                        day: 'MMM DD' // 日付を表示
                       }
                     },
                     title: {
