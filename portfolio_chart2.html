@@ -37,35 +37,23 @@
     <canvas id="stockChart"></canvas>
   </div>
   <script>
-    // クエリパラメーターから企業名を取得
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     const companyName = urlParams.get('companyName');
-    const apiUrl = "https://script.googleusercontent.com/macros/echo?user_content_key=k9H6PkHpMdd_hUTx3sc_ZR3UIGg5GdaqEFbpNEMnxPScYenDzsXmFStsDmta7oAY9zdJYwl4z7Uf3Lwt3AEc3nTpFgM4UO78OJmA1Yb3SEsKFZqtv3DaNYcMrmhZHmUMWojr9NvTBuBLhyHCd5hHa9iZ2UrqsNGz5NG1wsGokvbjgMWki11QBVU-i_4JSvzKLqE9G6KaWWwpS_iHTI_qznpD1-pG9aQ66d09L5B6dufr9eGNRgEtOAtBHn44AOQPmqyykG4rweN-ikh8riXu6ey_2U42-toKyua8602ukhQfqZwicMi52xeRlp9bbpE7AGG_PsK_njA2DDULVXnOAJqUnIyoTUoHTgeEpawCANNi1YnhDb42Dg&lib=ME8d0Tfb6a7zUNaTeDZ1PNbABPh_Ti3Gl";
+    const apiUrl = "https://script.google.com/macros/s/デプロイID/exec?action=getStockPriceByCompany&companyName=" + companyName;
 
     if (!companyName) {
       document.body.innerHTML = "<p>Error: No companyName provided in the URL. Please add ?companyName=CompanyName to the URL.</p>";
       console.error("Error: No companyName provided in the URL.");
     } else {
-      // APIからデータを取得
       fetch(apiUrl)
         .then(response => response.json())
         .then(data => {
           if (data.status === "success") {
             const stockData = data.data;
 
-            // 最新日付を取得
-            const latestDate = moment(stockData[stockData.length - 1].date);
-            const oneMonthAgo = moment(latestDate).subtract(1, 'months');
-
-            // 1ヶ月分のデータをフィルタリング
-            const filteredData = stockData.filter(item => {
-              const itemDate = moment(item.date);
-              return itemDate.isBetween(oneMonthAgo, latestDate, 'day', '[]');
-            });
-
-            // データをChart.jsのフォーマットに変換
-            const chartData = filteredData.map(item => ({
+            // Chart.jsのデータ形式に変換
+            const chartData = stockData.map(item => ({
               x: item.date,
               o: item.open,
               h: item.high,
@@ -74,7 +62,7 @@
             }));
 
             // 最大値と最小値を計算
-            const allPrices = filteredData.flatMap(item => [item.high, item.low]);
+            const allPrices = stockData.flatMap(item => [item.high, item.low]);
             const minPrice = Math.min(...allPrices);
             const maxPrice = Math.max(...allPrices);
 
