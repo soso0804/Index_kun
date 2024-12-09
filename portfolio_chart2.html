@@ -37,6 +37,7 @@
     <canvas id="stockChart"></canvas>
   </div>
   <script>
+    // クエリパラメータから企業名を取得
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     const companyName = urlParams.get('companyName');
@@ -61,11 +62,6 @@
               c: item.close // 終値
             }));
 
-            // 最大値と最小値を計算
-            const allPrices = stockData.flatMap(item => [item.high, item.low]);
-            const minPrice = Math.min(...allPrices);
-            const maxPrice = Math.max(...allPrices);
-
             // Chart.jsでチャートを描画
             const ctx = document.getElementById('stockChart').getContext('2d');
             new Chart(ctx, {
@@ -74,8 +70,11 @@
                 datasets: [{
                   label: `${companyName} 株価チャート`,
                   data: chartData,
-                  borderColor: '#333',
-                  borderWidth: 1
+                  color: {
+                    up: 'rgb(75, 192, 192)',
+                    down: 'rgb(255, 99, 132)',
+                    unchanged: 'rgb(200, 200, 200)'
+                  }
                 }]
               },
               options: {
@@ -113,8 +112,6 @@
                     }
                   },
                   y: {
-                    min: minPrice * 0.95, // 最小値を少し低めに設定
-                    max: maxPrice * 1.05, // 最大値を少し高めに設定
                     title: {
                       display: true,
                       text: 'Price'
