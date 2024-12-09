@@ -51,12 +51,21 @@
       fetch(apiUrl)
         .then(response => response.json())
         .then(data => {
-          console.log(data); // デバッグ用にデータを確認
           if (data.status === "success") {
             const stockData = data.data;
 
+            // 最新日付を取得
+            const latestDate = moment(stockData[stockData.length - 1].date);
+            const oneMonthAgo = moment(latestDate).subtract(1, 'months');
+
+            // 1ヶ月分のデータをフィルタリング
+            const filteredData = stockData.filter(item => {
+              const itemDate = moment(item.date);
+              return itemDate.isBetween(oneMonthAgo, latestDate, 'day', '[]');
+            });
+
             // データをChart.jsのフォーマットに変換
-            const chartData = stockData.map(item => ({
+            const chartData = filteredData.map(item => ({
               x: item.date,
               o: item.open,
               h: item.high,
@@ -65,7 +74,7 @@
             }));
 
             // 最大値と最小値を計算
-            const allPrices = stockData.flatMap(item => [item.high, item.low]);
+            const allPrices = filteredData.flatMap(item => [item.high, item.low]);
             const minPrice = Math.min(...allPrices);
             const maxPrice = Math.max(...allPrices);
 
