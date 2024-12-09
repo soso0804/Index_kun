@@ -22,95 +22,84 @@
         }
         select {
             margin-bottom: 20px;
-            padding: 5px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        canvas {
+            max-width: 800px;
+            max-height: 400px;
         }
     </style>
 </head>
 <body>
     <h1>企業別ろうそく足チャート</h1>
-    <select id="companySelect"></select>
     <canvas id="candlestickChart" width="800" height="400"></canvas>
     <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentCompany = urlParams.get('company'); // Adaloから渡された企業名
+
         const apiUrl = "https://script.google.com/macros/s/AKfycby8gB7epAR5iSSCix6YCRh3MgZLYNd_7zhBVvnLJDpAKauNWJ9wsoOzutBtFKq96JQR/exec";
 
         fetch(apiUrl)
             .then(response => response.json())
             .then(data => {
-                const companySelect = document.getElementById('companySelect');
+                const companyData = data.find(c => c.company === currentCompany);
+                if (!companyData) {
+                    alert("指定された企業のデータが見つかりません");
+                    return;
+                }
+
+                const formattedData = companyData.data.map(item => ({
+                    x: item.date,
+                    o: item.open,
+                    h: item.high,
+                    l: item.low,
+                    c: item.close
+                }));
+
                 const ctx = document.getElementById('candlestickChart').getContext('2d');
-                let chart;
-
-                // ドロップダウンに企業名を追加
-                data.forEach(company => {
-                    const option = document.createElement('option');
-                    option.value = company.company;
-                    option.textContent = company.company;
-                    companySelect.appendChild(option);
-                });
-
-                // チャートを描画
-                function drawChart(companyName) {
-                    const companyData = data.find(c => c.company === companyName);
-                    const formattedData = companyData.data.map(item => ({
-                        x: item.date,
-                        o: item.open,
-                        h: item.high,
-                        l: item.low,
-                        c: item.close
-                    }));
-
-                    if (chart) chart.destroy();
-                    chart = new Chart(ctx, {
-                        type: 'candlestick',
-                        data: {
-                            datasets: [{
-                                label: companyName,
-                                data: formattedData,
-                                borderColor: 'black',
-                                color: {
-                                    up: '#26a69a',
-                                    down: '#ef5350',
-                                    unchanged: '#888'
-                                }
-                            }]
+                new Chart(ctx, {
+                    type: 'candlestick',
+                    data: {
+                        datasets: [{
+                            label: currentCompany,
+                            data: formattedData,
+                            borderColor: 'black',
+                            color: {
+                                up: '#26a69a',
+                                down: '#ef5350',
+                                unchanged: '#888'
+                            }
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
                         },
-                        options: {
-                            responsive: true,
-                            plugins: {
-                                legend: {
-                                    display: false
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: 'day',
+                                    tooltipFormat: 'YYYY-MM-DD'
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Date'
                                 }
                             },
-                            scales: {
-                                x: {
-                                    type: 'time',
-                                    time: {
-                                        unit: 'day',
-                                        tooltipFormat: 'YYYY-MM-DD'
-                                    },
-                                    title: {
-                                        display: true,
-                                        text: 'Date'
-                                    }
-                                },
-                                y: {
-                                    title: {
-                                        display: true,
-                                        text: 'Price'
-                                    }
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Price'
                                 }
                             }
                         }
-                    });
-                }
-
-                // ドロップダウン変更時にチャートを更新
-                companySelect.addEventListener('change', () => {
-                    drawChart(companySelect.value);
+                    }
                 });
-
-                // 初期表示: 最初の企業
-                drawChart(data[0].company);
             })
             .catch(error => console.error('Error loading data:', error));
     </script>
