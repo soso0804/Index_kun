@@ -57,7 +57,6 @@
           return response.json();
         })
         .then(data => {
-          console.log(data); // デバッグ用にデータを確認
           if (data.status === "success") {
             const stockData = data.data;
 
@@ -69,6 +68,11 @@
               l: item.low,
               c: item.close
             }));
+
+            // 最大値と最小値を計算
+            const allPrices = stockData.flatMap(item => [item.high, item.low]);
+            const minPrice = Math.min(...allPrices);
+            const maxPrice = Math.max(...allPrices);
 
             // Chart.jsでチャートを描画
             const ctx = document.getElementById('stockChart').getContext('2d');
@@ -106,7 +110,10 @@
                   x: {
                     type: 'time',
                     time: {
-                      unit: 'day'
+                      unit: 'day',
+                      displayFormats: {
+                        day: 'MMM DD, HH:mm' // 日付と時刻を表示
+                      }
                     },
                     title: {
                       display: true,
@@ -114,6 +121,8 @@
                     }
                   },
                   y: {
+                    min: minPrice * 0.95, // 最小値を少し低めに設定
+                    max: maxPrice * 1.05, // 最大値を少し高めに設定
                     title: {
                       display: true,
                       text: 'Price'
