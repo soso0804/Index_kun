@@ -1,176 +1,118 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>株価変動チャート</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-  <script src="https://cdn.jsdelivr.net/npm/date-fns"></script>
-  <style>
-    body {
-      margin: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      background-color: #f8f9fa;
-      height: 100vh;
-      font-family: Arial, sans-serif;
-    }
-    h1 {
-      font-size: 1.5rem;
-      color: #343a40;
-      margin: 10px 0;
-      text-align: center;
-    }
-    canvas {
-      max-width: 90%;
-      width: 100%;
-      height: 80%;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企業別ろうそく足チャート</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #222;
+            color: white;
+        }
+        select {
+            margin-bottom: 20px;
+            padding: 5px;
+        }
+    </style>
 </head>
 <body>
-  <h1 id="chartTitle"></h1>
-  <canvas id="candlestickChart"></canvas>
-  <script>
-    const queryString = window.location.search;
-    const urlParams = new URLSearchParams(queryString);
-    const companyName = urlParams.get("companyName");
-    const startDate = urlParams.get("startDate");
-    const endDate = urlParams.get("endDate");
+    <h1>企業別ろうそく足チャート</h1>
+    <select id="companySelect"></select>
+    <canvas id="candlestickChart" width="800" height="400"></canvas>
+    <script>
+        const apiUrl = "https://script.google.com/macros/s/AKfycby8gB7epAR5iSSCix6YCRh3MgZLYNd_7zhBVvnLJDpAKauNWJ9wsoOzutBtFKq96JQR/exec";
 
-    // 動的にタイトルを設定
-    const titleElement = document.getElementById("chartTitle");
-    if (companyName) {
-      titleElement.textContent = `${companyName}の株価変動チャート`;
-    } else {
-      titleElement.textContent = "株価変動チャート";
-    }
+        fetch(apiUrl)
+            .then(response => response.json())
+            .then(data => {
+                const companySelect = document.getElementById('companySelect');
+                const ctx = document.getElementById('candlestickChart').getContext('2d');
+                let chart;
 
-    const apiUrl = `https://script.google.com/macros/s/AKfycbwk0zNt_5_y4jOkNoGHDx_1raOeF4zpUlej2OisH773pAe0Bpu7RC5cqupn50h3fRGt/exec?action=getStockPriceByCompany&companyName=${companyName}&startDate=${startDate}&endDate=${endDate}`;
-
-    fetch(apiUrl)
-      .then(response => response.json())
-      .then(data => {
-        if (data.status === "success") {
-          const rawData = data.data;
-
-          // 日付が抜けている部分を埋める
-          const completeData = [];
-          const start = new Date(startDate);
-          const end = new Date(endDate);
-          let currentDate = new Date(start);
-
-          while (currentDate <= end) {
-            const formattedDate = currentDate.toISOString().split("T")[0];
-            const existing = rawData.find(item => item.date === formattedDate);
-
-            if (existing) {
-              completeData.push({
-                x: new Date(existing.date),
-                o: existing.open,
-                h: existing.high,
-                l: existing.low,
-                c: existing.close,
-              });
-            } else {
-              // 前日の終値を継続するデータを作成
-              const prev = completeData[completeData.length - 1];
-              if (prev) {
-                completeData.push({
-                  x: new Date(formattedDate),
-                  o: prev.c,
-                  h: prev.c,
-                  l: prev.c,
-                  c: prev.c,
+                // ドロップダウンに企業名を追加
+                data.forEach(company => {
+                    const option = document.createElement('option');
+                    option.value = company.company;
+                    option.textContent = company.company;
+                    companySelect.appendChild(option);
                 });
-              }
-            }
-            currentDate.setDate(currentDate.getDate() + 1);
-          }
 
-          const ctx = document.getElementById("candlestickChart").getContext("2d");
-          new Chart(ctx, {
-            type: "candlestick",
-            data: {
-              datasets: [{
-                label: `${companyName} 株価`,
-                data: completeData,
-                color: {
-                  up: "#26a69a",
-                  down: "#ef5350",
-                  unchanged: "#ffa726"
-                },
-                borderWidth: 1
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              scales: {
-                x: {
-                  type: "time",
-                  time: {
-                    unit: "day", // 日単位で表示
-                    stepSize: 1, // 毎日を表示
-                    displayFormats: {
-                      day: "MMM dd", // 月 日のフォーマット
-                    },
-                  },
-                  title: {
-                    display: true,
-                    text: "日付",
-                    color: "#333"
-                  },
-                  grid: {
-                    color: "#e0e0e0"
-                  },
-                  ticks: {
-                    maxTicksLimit: 10 // 横軸の目盛りを適度に制限
-                  }
-                },
-                y: {
-                  title: {
-                    display: true,
-                    text: "株価 (円)",
-                    color: "#333"
-                  },
-                  grid: {
-                    color: "#e0e0e0"
-                  }
+                // チャートを描画
+                function drawChart(companyName) {
+                    const companyData = data.find(c => c.company === companyName);
+                    const formattedData = companyData.data.map(item => ({
+                        x: item.date,
+                        o: item.open,
+                        h: item.high,
+                        l: item.low,
+                        c: item.close
+                    }));
+
+                    if (chart) chart.destroy();
+                    chart = new Chart(ctx, {
+                        type: 'candlestick',
+                        data: {
+                            datasets: [{
+                                label: companyName,
+                                data: formattedData,
+                                borderColor: 'black',
+                                color: {
+                                    up: '#26a69a',
+                                    down: '#ef5350',
+                                    unchanged: '#888'
+                                }
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    type: 'time',
+                                    time: {
+                                        unit: 'day',
+                                        tooltipFormat: 'YYYY-MM-DD'
+                                    },
+                                    title: {
+                                        display: true,
+                                        text: 'Date'
+                                    }
+                                },
+                                y: {
+                                    title: {
+                                        display: true,
+                                        text: 'Price'
+                                    }
+                                }
+                            }
+                        }
+                    });
                 }
-              },
-              plugins: {
-                legend: {
-                  position: "top",
-                  labels: {
-                    font: {
-                      size: 12
-                    },
-                    color: "#333"
-                  }
-                },
-                tooltip: {
-                  callbacks: {
-                    label: (context) => {
-                      const ohlc = context.raw;
-                      return `開: ${ohlc.o} 高: ${ohlc.h} 安: ${ohlc.l} 終: ${ohlc.c}`;
-                    }
-                  }
-                }
-              }
-            }
-          });
-        } else {
-          document.body.innerHTML = `<p>Error: ${data.message}</p>`;
-        }
-      })
-      .catch(error => {
-        document.body.innerHTML = `<p>Error fetching data: ${error.message}</p>`;
-      });
-  </script>
+
+                // ドロップダウン変更時にチャートを更新
+                companySelect.addEventListener('change', () => {
+                    drawChart(companySelect.value);
+                });
+
+                // 初期表示: 最初の企業
+                drawChart(data[0].company);
+            })
+            .catch(error => console.error('Error loading data:', error));
+    </script>
 </body>
 </html>
