@@ -54,11 +54,11 @@
 
             // Chart.jsのデータ形式に変換
             const chartData = stockData.map(item => ({
-              x: item.date,
-              o: item.open,
-              h: item.high,
-              l: item.low,
-              c: item.close
+              x: item.date, // 日付
+              o: item.open, // 始値
+              h: item.high, // 高値
+              l: item.low,  // 安値
+              c: item.close // 終値
             }));
 
             // 最大値と最小値を計算
