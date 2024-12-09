@@ -1,28 +1,25 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>株価変動チャート</title>
+  <title>Portfolio Chart</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial/dist/chartjs-chart-financial.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
   <style>
+    /* 全体レイアウト調整 */
     body {
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
       margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      height: 100vh; /* 全体を画面サイズに合わせる */
+      box-sizing: border-box;
     }
 
     #chart-container {
-      width: 90%;
-      max-width: 800px;
-      margin-top: 20px;
+      width: 90%; /* 横幅の余白を持たせる */
+      max-width: 400px; /* 最大幅を設定 */
     }
 
     canvas {
@@ -32,89 +29,78 @@
   </style>
 </head>
 <body>
-  <h1>株価変動チャート</h1>
   <div id="chart-container">
-    <canvas id="stockChart"></canvas>
+    <canvas id="portfolioChart"></canvas>
   </div>
   <script>
-    // クエリパラメータから企業名を取得
-    const queryString = window.location.search;
+    // ユーザーのデータをAPIから取得
+    const queryString = window.location.search; // URLのクエリパラメータ
     const urlParams = new URLSearchParams(queryString);
-    const companyName = urlParams.get('companyName');
-    const apiUrl = "https://script.google.com/macros/s/AKfycbyiBTNsJVWpbU2qG4UPfuyqfkenSioR9XKNzFRrc305LJd8wNCTLISv-VCwSdnr1ktv/exec?action=getStockPriceByCompany&companyName=" + companyName;
+    const userName = urlParams.get('userName'); // userNameの取得
+    const apiUrl = "https://script.google.com/macros/s/AKfycbw8ivxsRZLKEN2nkcBYSArSVMOuzhczkCibueCU3ROtjszdqQbRlY6IeZn8aNnNjRR4/exec?action=getUserPortfolio&userName=" + userName;
 
-    if (!companyName) {
-      document.body.innerHTML = "<p>Error: No companyName provided in the URL. Please add ?companyName=CompanyName to the URL.</p>";
-      console.error("Error: No companyName provided in the URL.");
+    if (!userName) {
+      document.body.innerHTML = "<p>Error: No userName provided in the URL. Please add ?userName=your-email@example.com to the URL.</p>";
+      console.error("Error: No userName provided in the URL.");
     } else {
       fetch(apiUrl)
-        .then(response => response.json())
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          return response.json();
+        })
         .then(data => {
           if (data.status === "success") {
-            const stockData = data.data;
+            let portfolioData = data.data;
 
-            // Chart.jsのデータ形式に変換
-            const chartData = stockData.map(item => ({
-              x: item.date, // 日付
-              o: item.open, // 始値
-              h: item.high, // 高値
-              l: item.low,  // 安値
-              c: item.close // 終値
-            }));
+            // totalStockの多い順にソート
+            portfolioData = portfolioData.sort((a, b) => b.totalStock - a.totalStock);
 
-            // Chart.jsでチャートを描画
-            const ctx = document.getElementById('stockChart').getContext('2d');
+            // ソートされたデータからラベルと値を抽出
+            const labels = portfolioData.map(item => item.companyName);
+            const stockValues = portfolioData.map(item => parseInt(item.totalStock, 10));
+
+            // 多種類の背景色を設定
+            const backgroundColors = [
+              '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40',
+              '#E6B0AA', '#A9CCE3', '#F9E79F', '#76D7C4', '#BB8FCE', '#F1948A',
+              '#A3E4D7', '#85C1E9', '#F7DC6F', '#F5B7B1', '#D5DBDB', '#FAD7A0'
+            ];
+
+            // グラフを描画
+            const ctx = document.getElementById('portfolioChart').getContext('2d');
             new Chart(ctx, {
-              type: 'candlestick',
+              type: 'pie',
               data: {
+                labels: labels,
                 datasets: [{
-                  label: `${companyName} 株価チャート`,
-                  data: chartData,
-                  color: {
-                    up: 'rgb(75, 192, 192)',
-                    down: 'rgb(255, 99, 132)',
-                    unchanged: 'rgb(200, 200, 200)'
-                  }
+                  label: '持ち株数', // ツールチップに表示されるラベル
+                  data: stockValues,
+                  backgroundColor: backgroundColors,
+                  borderWidth: 1
                 }]
               },
               options: {
                 responsive: true,
+                maintainAspectRatio: false, // キャンバスのアスペクト比をカスタマイズ可能に
                 plugins: {
                   legend: {
-                    position: 'top'
+                    position: 'bottom', // 凡例を下に配置
+                    labels: {
+                      font: {
+                        size: 12 // 凡例の文字サイズを調整
+                      }
+                    }
                   },
                   tooltip: {
                     callbacks: {
-                      label: (context) => {
-                        const data = context.raw;
-                        return [
-                          `Open: ${data.o}`,
-                          `High: ${data.h}`,
-                          `Low: ${data.l}`,
-                          `Close: ${data.c}`
-                        ];
+                      label: function(tooltipItem) {
+                        const dataIndex = tooltipItem.dataIndex;
+                        const stock = stockValues[dataIndex];
+                        const label = labels[dataIndex];
+                        return `持ち株数：${stock}株`; // ツールチップの内容を修正
                       }
-                    }
-                  }
-                },
-                scales: {
-                  x: {
-                    type: 'time',
-                    time: {
-                      unit: 'day',
-                      displayFormats: {
-                        day: 'MMM DD' // 日付を表示
-                      }
-                    },
-                    title: {
-                      display: true,
-                      text: 'Date'
-                    }
-                  },
-                  y: {
-                    title: {
-                      display: true,
-                      text: 'Price'
                     }
                   }
                 }
