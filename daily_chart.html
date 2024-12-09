@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>企業別ろうそく足チャート</title>
+    <title>ろうそく足チャート</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
     <script src="https://cdn.jsdelivr.net/npm/moment"></script>
@@ -17,13 +17,8 @@
             justify-content: center;
             height: 100vh;
             margin: 0;
-            background-color: #222;
-            color: white;
-        }
-        select {
-            margin-bottom: 20px;
-            padding: 10px;
-            font-size: 16px;
+            background-color: #fff; /* 背景色を白に */
+            color: black; /* フォントを黒に */
         }
         canvas {
             max-width: 800px;
@@ -32,12 +27,13 @@
     </style>
 </head>
 <body>
-    <h1>企業別ろうそく足チャート</h1>
     <canvas id="candlestickChart" width="800" height="400"></canvas>
     <script>
+        // URLクエリから企業名を取得
         const urlParams = new URLSearchParams(window.location.search);
-        const currentCompany = urlParams.get('company'); // Adaloから渡された企業名
+        const currentCompany = urlParams.get('company'); // 例: APA-KASUMI
 
+        // Google Apps ScriptのAPI URL
         const apiUrl = "https://script.google.com/macros/s/AKfycby8gB7epAR5iSSCix6YCRh3MgZLYNd_7zhBVvnLJDpAKauNWJ9wsoOzutBtFKq96JQR/exec";
 
         fetch(apiUrl)
