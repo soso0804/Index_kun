@@ -37,7 +37,7 @@
     const queryString = window.location.search; // URLのクエリパラメータ
     const urlParams = new URLSearchParams(queryString);
     const userName = urlParams.get('userName'); // userNameの取得
-    const apiUrl = "https://script.google.com/macros/s/AKfycbw8ivxsRZLKEN2nkcBYSArSVMOuzhczkCibueCU3ROtjszdqQbRlY6IeZn8aNnNjRR4/exec?action=getUserPortfolio&userName=" + userName;
+    const apiUrl = "https://script.google.com/macros/s/AKfycbxIZOnDYvU4wn87kALQAp66Z-SAMvXNCpEU4GgTcyYqyHhoTQE0CgRFECVpGfjLL6Zh/exec?action=getUserPortfolio&userName=" + userName;
 
     if (!userName) {
       document.body.innerHTML = "<p>Error: No userName provided in the URL. Please add ?userName=your-email@example.com to the URL.</p>";
