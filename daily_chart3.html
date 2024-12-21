@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>直近1週間の株価変動</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    #chart-container {
+      width: 90%;
+      max-width: 800px;
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>直近1週間の株価変動</h1>
+  <div id="chart-container">
+    <canvas id="stockChart"></canvas>
+  </div>
+  <script>
+    // クエリパラメータからcompanyNameを取得
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    const companyName = urlParams.get("companyName");
+
+    if (!companyName) {
+      document.body.innerHTML = "<p>Error: companyName parameter is missing in the URL.</p>";
+      throw new Error("Missing companyName parameter.");
+    }
+
+    // Google Apps ScriptのAPI URL
+    const apiUrl = `https://script.google.com/macros/s/AKfycbwo-_8y844vtUIyce0s-zdrlFmhNuKI1_oYCaF8PSlGR0FB86vrFKJD1Ap0T451BKw/exec?companyName=${encodeURIComponent(companyName)}`;
+
+    // 当日の日付を取得
+    const today = moment().format("YYYY-MM-DD");
+    const oneWeekAgo = moment().subtract(6, "days").format("YYYY-MM-DD");
+
+    fetch(apiUrl)
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.status === "success") {
+          const stockData = data.data;
+
+          // 直近7日分の日付リストを生成
+          const dates = [];
+          for (let i = 0; i < 7; i++) {
+            dates.push(moment().subtract(i, "days").format("YYYY-MM-DD"));
+          }
+          dates.reverse(); // 過去から現在の順に並べる
+
+          // 日付ごとの株価データを整備
+          const dateToPriceMap = {};
+          stockData.forEach((item) => {
+            dateToPriceMap[item.date] = item.currentPrice;
+          });
+
+          const chartData = [];
+          let previousPrice = null;
+
+          dates.forEach((date) => {
+            if (dateToPriceMap[date] !== undefined) {
+              previousPrice = dateToPriceMap[date]; // 現在の価格を更新
+            }
+            chartData.push({ date: date, price: previousPrice });
+          });
+
+          // Chart.jsでチャートを描画
+          const ctx = document.getElementById("stockChart").getContext("2d");
+          new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: chartData.map((item) => item.date),
+              datasets: [
+                {
+                  label: `${companyName} 株価変動`,
+                  data: chartData.map((item) => item.price),
+                  borderColor: "rgb(75, 192, 192)",
+                  backgroundColor: "rgba(75, 192, 192, 0.2)",
+                  tension: 0.4,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: {
+                  display: true,
+                },
+              },
+              scales: {
+                x: {
+                  type: "time",
+                  time: {
+                    unit: "day",
+                    tooltipFormat: "YYYY-MM-DD",
+                  },
+                },
+                y: {
+                  title: {
+                    display: true,
+                    text: "価格",
+                  },
+                },
+              },
+            },
+          });
+        } else {
+          document.body.innerHTML = `<p>Error: ${data.message}</p>`;
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching data:", error);
+        document.body.innerHTML = `<p>Error fetching data: ${error.message}</p>`;
+      });
+  </script>
+</body>
+</html>
