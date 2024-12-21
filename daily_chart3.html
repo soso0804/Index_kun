@@ -3,10 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>直近1週間の株価変動</title>
+  <title>株価変動グラフ</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -30,12 +29,12 @@
   </style>
 </head>
 <body>
-  <h1>直近1週間の株価変動</h1>
+  <h1>株価変動グラフ</h1>
   <div id="chart-container">
     <canvas id="stockChart"></canvas>
   </div>
   <script>
-    // クエリパラメータからcompanyNameを取得
+    // クエリパラメーターからcompanyNameを取得
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     const companyName = urlParams.get("companyName");
@@ -54,68 +53,66 @@
         if (data.status === "success") {
           const stockData = data.data;
 
-          // 直近7日分の日付リストを生成
-          const dates = [];
-          for (let i = 0; i < 7; i++) {
-            dates.push(moment().subtract(i, "days").format("YYYY-MM-DD"));
-          }
-          dates.reverse(); // 過去から現在の順に並べる
+          // 今日の日付を取得
+          const today = moment().format("YYYY-MM-DD");
 
-          // 日付ごとの株価データを整備
-          const dateToPriceMap = {};
-          stockData.forEach((item) => {
-            dateToPriceMap[item.date] = item.currentPrice;
+          // データ構造を整形
+          const dates = Array.from(new Set(stockData.map(item => item.date))); // 一意な日付リスト
+          const processedData = dates.map(date => {
+            const dailyPrices = stockData
+              .filter(item => item.date === date)
+              .map(item => item.currentPrice);
+
+            return {
+              date,
+              high: Math.max(...dailyPrices),
+              low: Math.min(...dailyPrices),
+              isToday: date === today
+            };
           });
 
-          const chartData = [];
-          let previousPrice = null;
+          // 今日のデータとそれ以外に分ける
+          const todayData = processedData.find(item => item.isToday);
+          const otherData = processedData.filter(item => !item.isToday);
 
-          dates.forEach((date) => {
-            if (dateToPriceMap[date] !== undefined) {
-              previousPrice = dateToPriceMap[date]; // 現在の価格を更新
-            }
-            chartData.push({ date: date, price: previousPrice });
-          });
+          // グラフデータを構築
+          const dataset = {
+            labels: processedData.map(item => item.date),
+            datasets: [
+              // 四角形データ (高値と安値で矩形)
+              {
+                label: "過去の日付 (高値-安値)",
+                data: otherData.map(item => (item.high + item.low) / 2), // 表示用: 中間値
+                backgroundColor: "rgba(75, 192, 192, 0.2)",
+                borderColor: "rgb(75, 192, 192)",
+                borderWidth: 1,
+              },
+              // 今日のデータ (点プロット)
+              {
+                label: "今日の値",
+                data: todayData ? [todayData.high] : [],
+                backgroundColor: "rgba(255, 99, 132, 1)",
+                pointStyle: 'circle',
+                radius: 5,
+              },
+            ],
+          };
 
-          // 縦軸の最大値と最小値を動的に設定
-          const prices = chartData.map((item) => item.price).filter((price) => price !== null);
-          const minPrice = Math.min(...prices);
-          const maxPrice = Math.max(...prices);
-
-          // Chart.jsでチャートを描画
+          // Chart.jsで描画
           const ctx = document.getElementById("stockChart").getContext("2d");
           new Chart(ctx, {
-            type: "line",
-            data: {
-              labels: chartData.map((item) => item.date),
-              datasets: [
-                {
-                  label: `${companyName} 株価変動`,
-                  data: chartData.map((item) => item.price),
-                  borderColor: "rgb(75, 192, 192)",
-                  backgroundColor: "rgba(75, 192, 192, 0.2)",
-                  tension: 0.4,
-                },
-              ],
-            },
+            type: "scatter",
+            data: dataset,
             options: {
-              responsive: true,
-              plugins: {
-                legend: {
-                  display: true,
-                },
-              },
               scales: {
                 x: {
-                  type: "time",
-                  time: {
-                    unit: "day",
-                    tooltipFormat: "YYYY-MM-DD",
+                  type: "category",
+                  title: {
+                    display: true,
+                    text: "日付",
                   },
                 },
                 y: {
-                  min: minPrice - 10, // 最小値に少し余裕を持たせる
-                  max: maxPrice + 10, // 最大値に少し余裕を持たせる
                   title: {
                     display: true,
                     text: "価格",
