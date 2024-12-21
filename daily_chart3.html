@@ -48,10 +48,6 @@
     // Google Apps ScriptのAPI URL
     const apiUrl = `https://script.google.com/macros/s/AKfycbwo-_8y844vtUIyce0s-zdrlFmhNuKI1_oYCaF8PSlGR0FB86vrFKJD1Ap0T451BKw/exec?companyName=${encodeURIComponent(companyName)}`;
 
-    // 当日の日付を取得
-    const today = moment().format("YYYY-MM-DD");
-    const oneWeekAgo = moment().subtract(6, "days").format("YYYY-MM-DD");
-
     fetch(apiUrl)
       .then((response) => response.json())
       .then((data) => {
@@ -80,6 +76,11 @@
             }
             chartData.push({ date: date, price: previousPrice });
           });
+
+          // 縦軸の最大値と最小値を動的に設定
+          const prices = chartData.map((item) => item.price).filter((price) => price !== null);
+          const minPrice = Math.min(...prices);
+          const maxPrice = Math.max(...prices);
 
           // Chart.jsでチャートを描画
           const ctx = document.getElementById("stockChart").getContext("2d");
@@ -113,6 +114,8 @@
                   },
                 },
                 y: {
+                  min: minPrice - 10, // 最小値に少し余裕を持たせる
+                  max: maxPrice + 10, // 最大値に少し余裕を持たせる
                   title: {
                     display: true,
                     text: "価格",
