@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>株価変動グラフ</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
   <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -58,9 +56,9 @@
           // 今日の日付を取得
           const today = moment().format("YYYY-MM-DD");
 
-          // キャンドルスティックチャート用データを作成
-          const financialData = [];
-          const currentPriceData = [];
+          // データ構造を整形
+          const rectangleData = [];
+          const todayData = [];
 
           stockData.forEach(item => {
             const date = item.date;
@@ -68,42 +66,57 @@
 
             if (date === today) {
               // 今日のデータはcurrentPriceを使って点をプロット
-              currentPriceData.push({
+              todayData.push({
                 x: date,
                 y: item.currentPrice
               });
             } else {
-              // 過去の日付データ
+              // 過去の日付データを矩形として格納
               const dailyPrices = stockData.filter(data => data.date === date).map(data => data.contractedPrice);
-              financialData.push({
-                x: date,
-                o: Math.min(...dailyPrices), // 開始値 (仮に最小値)
-                h: Math.max(...dailyPrices), // 高値
-                l: Math.min(...dailyPrices), // 安値
-                c: Math.max(...dailyPrices), // 終値 (仮に最大値)
+              rectangleData.push({
+                date,
+                high: Math.max(...dailyPrices),
+                low: Math.min(...dailyPrices)
               });
             }
           });
 
-          // Chart.jsで描画
+          // Chart.jsで描画データ作成
+          const labels = rectangleData.map(item => item.date);
+          const highData = rectangleData.map(item => item.high);
+          const lowData = rectangleData.map(item => item.low);
+
           const ctx = document.getElementById("stockChart").getContext("2d");
           new Chart(ctx, {
-            type: "candlestick",
+            type: "bar",
             data: {
+              labels: labels,
               datasets: [
                 {
-                  label: "過去のデータ",
-                  data: financialData,
-                  borderColor: "rgba(75, 192, 192, 1)",
+                  label: "最大値",
+                  data: highData,
                   backgroundColor: "rgba(75, 192, 192, 0.2)",
+                  borderColor: "rgba(75, 192, 192, 1)",
+                  borderWidth: 1,
+                  barPercentage: 0.5, // バーの幅調整
+                  categoryPercentage: 0.8
+                },
+                {
+                  label: "最小値",
+                  data: lowData,
+                  backgroundColor: "rgba(192, 75, 75, 0.2)",
+                  borderColor: "rgba(192, 75, 75, 1)",
+                  borderWidth: 1,
+                  barPercentage: 0.5, // バーの幅調整
+                  categoryPercentage: 0.8
                 },
                 {
                   label: "今日の値",
                   type: "scatter",
-                  data: currentPriceData,
+                  data: todayData,
                   backgroundColor: "rgba(255, 99, 132, 1)",
                   pointStyle: "circle",
-                  radius: 6,
+                  radius: 6
                 }
               ]
             },
@@ -111,29 +124,19 @@
               responsive: true,
               scales: {
                 x: {
-                  type: "time",
-                  adapters: {
-                    date: {
-                      displayFormats: {
-                        day: "YYYY-MM-DD"
-                      }
-                    }
-                  },
+                  type: "category",
                   title: {
                     display: true,
-                    text: "日付",
-                  },
-                  time: {
-                    unit: "day"
+                    text: "日付"
                   }
                 },
                 y: {
                   title: {
                     display: true,
-                    text: "価格",
-                  },
-                },
-              },
+                    text: "価格"
+                  }
+                }
+              }
             }
           });
         } else {
