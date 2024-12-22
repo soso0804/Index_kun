@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>株価変動グラフ</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    #chart-container {
+      width: 90%;
+      max-width: 800px;
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>株価変動グラフ</h1>
+  <div id="chart-container">
+    <canvas id="stockChart"></canvas>
+  </div>
+  <script>
+    // クエリパラメーターからcompanyNameを取得
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    const companyName = urlParams.get("companyName");
+
+    if (!companyName) {
+      document.body.innerHTML = "<p>Error: companyName parameter is missing in the URL.</p>";
+      throw new Error("Missing companyName parameter.");
+    }
+
+    // Google Apps ScriptのAPI URL
+    const apiUrl = `https://script.google.com/macros/s/AKfycbywGGARFIxv-jgbcEl57mwCP0-LJJI3RHqoMt6xqxu22EghU6nAYLgAiEMqB03i9TDY/exec?companyName=${encodeURIComponent(companyName)}`;
+
+    fetch(apiUrl)
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.status === "success") {
+          const stockData = data.data;
+
+          // 今日の日付を取得
+          const today = new Date().toISOString().split("T")[0];
+
+          // データ構造を整形
+          const rectangleData = [];
+          const todayPoint = [];
+
+          // 同一日のデータをグループ化
+          const groupedData = stockData.reduce((acc, item) => {
+            if (!acc[item.date]) {
+              acc[item.date] = [];
+            }
+            acc[item.date].push(item.contractedPrice);
+            return acc;
+          }, {});
+
+          // データを整形
+          Object.entries(groupedData).forEach(([date, prices]) => {
+            const maxPrice = Math.max(...prices);
+            const minPrice = Math.min(...prices);
+
+            if (date === today) {
+              // 本日の値
+              todayPoint.push({ x: date, y: maxPrice });
+            } else {
+              // 四角形データ
+              rectangleData.push({ x: date, y: minPrice, height: maxPrice - minPrice });
+            }
+          });
+
+          // Chart.jsで描画
+          const ctx = document.getElementById("stockChart").getContext("2d");
+          new Chart(ctx, {
+            type: "bar",
+            data: {
+              labels: rectangleData.map(item => item.x),
+              datasets: [
+                {
+                  label: "範囲（最大値-最小値）",
+                  data: rectangleData.map(item => ({
+                    x: item.x,
+                    y: item.y,
+                    base: item.y, // 最小値を下辺に設定
+                    height: item.height // 高さを最大値 - 最小値に設定
+                  })),
+                  backgroundColor: "rgba(75, 192, 192, 0.5)",
+                  borderColor: "rgba(75, 192, 192, 1)",
+                  borderWidth: 1,
+                },
+                {
+                  label: "本日の値",
+                  type: "scatter",
+                  data: todayPoint,
+                  backgroundColor: "rgba(255, 99, 132, 1)",
+                  pointStyle: "circle",
+                  radius: 6,
+                },
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                tooltip: {
+                  callbacks: {
+                    label: function(tooltipItem) {
+                      const dataPoint = rectangleData[tooltipItem.dataIndex];
+                      return `最大値: ${dataPoint.y + dataPoint.height}, 最小値: ${dataPoint.y}`;
+                    }
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  type: "category",
+                  title: {
+                    display: true,
+                    text: "日付",
+                  },
+                },
+                y: {
+                  title: {
+                    display: true,
+                    text: "価格",
+                  },
+                },
+              },
+            }
+          });
+        } else {
+          document.body.innerHTML = `<p>Error: ${data.message}</p>`;
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching data:", error);
+        document.body.innerHTML = `<p>Error fetching data: ${error.message}</p>`;
+      });
+  </script>
+</body>
+</html>
