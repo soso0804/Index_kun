@@ -53,8 +53,8 @@
           const stockData = data.data;
 
           const today = new Date().toISOString().split("T")[0];
-          const candlestickData = [];
-          const latestPrice = [];
+          const rectangles = [];
+          const todayPoint = [];
 
           const groupedData = stockData.reduce((acc, item) => {
             if (!acc[item.date]) {
@@ -70,35 +70,37 @@
 
             if (date === today) {
               const currentPrice = stockData.find(item => item.date === date).currentPrice;
-              latestPrice.push({ x: date, y: currentPrice });
+              todayPoint.push({ x: date, y: currentPrice });
             } else {
-              candlestickData.push({ x: date, max: maxPrice, min: minPrice });
+              rectangles.push({ date, min: minPrice, max: maxPrice });
             }
           });
 
           const ctx = document.getElementById("stockChart").getContext("2d");
 
-          // カスタム描画で矩形を描画
+          // Chart.jsで描画
           new Chart(ctx, {
             type: "bar",
             data: {
-              labels: candlestickData.map(item => item.x),
+              labels: rectangles.map(rect => rect.date),
               datasets: [
+                // 矩形（最大値-最小値）
                 {
-                  label: "株価範囲（最大値-最小値）",
-                  data: candlestickData.map(item => ({
-                    x: item.x,
-                    y: item.min,
-                    height: item.max - item.min,
+                  label: "株価範囲",
+                  data: rectangles.map(rect => ({
+                    x: rect.date,
+                    y: rect.min,
+                    max: rect.max,
                   })),
                   backgroundColor: "rgba(75, 192, 192, 0.5)",
                   borderColor: "rgba(75, 192, 192, 1)",
                   borderWidth: 1,
                 },
+                // 最新値
                 {
                   label: "最新値",
                   type: "scatter",
-                  data: latestPrice,
+                  data: todayPoint,
                   backgroundColor: "rgba(255, 99, 132, 1)",
                   pointStyle: "circle",
                   radius: 6,
@@ -114,8 +116,8 @@
                       if (tooltipItem.dataset.label === "最新値") {
                         return `最新値: ${tooltipItem.raw.y}`;
                       }
-                      if (tooltipItem.dataset.label === "株価範囲（最大値-最小値）") {
-                        const dataPoint = candlestickData[tooltipItem.dataIndex];
+                      if (tooltipItem.dataset.label === "株価範囲") {
+                        const dataPoint = rectangles[tooltipItem.dataIndex];
                         return `最大値: ${dataPoint.max}, 最小値: ${dataPoint.min}`;
                       }
                       return null;
