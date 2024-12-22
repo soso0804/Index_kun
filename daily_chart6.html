@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>株価変動グラフ</title>
+  <title>株価チャート</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
@@ -28,12 +28,11 @@
   </style>
 </head>
 <body>
-  <h1>株価変動グラフ</h1>
+  <h1 id="chart-title">株価チャート</h1>
   <div id="chart-container">
     <canvas id="stockChart"></canvas>
   </div>
   <script>
-    // クエリパラメーターからcompanyNameを取得
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     const companyName = urlParams.get("companyName");
@@ -43,7 +42,8 @@
       throw new Error("Missing companyName parameter.");
     }
 
-    // Google Apps ScriptのAPI URL
+    document.getElementById("chart-title").textContent = `${companyName} 株価チャート`;
+
     const apiUrl = `https://script.google.com/macros/s/AKfycbywGGARFIxv-jgbcEl57mwCP0-LJJI3RHqoMt6xqxu22EghU6nAYLgAiEMqB03i9TDY/exec?companyName=${encodeURIComponent(companyName)}`;
 
     fetch(apiUrl)
@@ -52,14 +52,11 @@
         if (data.status === "success") {
           const stockData = data.data;
 
-          // 今日の日付を取得
           const today = new Date().toISOString().split("T")[0];
-
-          // データ構造を整形
           const rectangleData = [];
+          const transparentData = [];
           const todayPoint = [];
 
-          // 同一日のデータをグループ化
           const groupedData = stockData.reduce((acc, item) => {
             if (!acc[item.date]) {
               acc[item.date] = [];
@@ -68,21 +65,18 @@
             return acc;
           }, {});
 
-          // データを整形
           Object.entries(groupedData).forEach(([date, prices]) => {
             const maxPrice = Math.max(...prices);
             const minPrice = Math.min(...prices);
 
             if (date === today) {
-              // 本日の値
               todayPoint.push({ x: date, y: maxPrice });
             } else {
-              // 四角形データ
               rectangleData.push({ x: date, y: minPrice, height: maxPrice - minPrice });
+              transparentData.push({ x: date, y: maxPrice });
             }
           });
 
-          // Chart.jsで描画
           const ctx = document.getElementById("stockChart").getContext("2d");
           new Chart(ctx, {
             type: "bar",
@@ -94,12 +88,24 @@
                   data: rectangleData.map(item => ({
                     x: item.x,
                     y: item.y,
-                    base: item.y, // 最小値を下辺に設定
-                    height: item.height // 高さを最大値 - 最小値に設定
                   })),
                   backgroundColor: "rgba(75, 192, 192, 0.5)",
                   borderColor: "rgba(75, 192, 192, 1)",
                   borderWidth: 1,
+                  barPercentage: 1.0,
+                  categoryPercentage: 0.8,
+                },
+                {
+                  label: "透明な範囲",
+                  data: transparentData.map(item => ({
+                    x: item.x,
+                    y: item.y,
+                  })),
+                  backgroundColor: "rgba(255, 255, 255, 1)",
+                  borderColor: "rgba(255, 255, 255, 0)",
+                  borderWidth: 0,
+                  barPercentage: 1.0,
+                  categoryPercentage: 0.8,
                 },
                 {
                   label: "本日の値",
@@ -109,19 +115,22 @@
                   pointStyle: "circle",
                   radius: 6,
                 },
-              ]
+              ],
             },
             options: {
               responsive: true,
               plugins: {
                 tooltip: {
                   callbacks: {
-                    label: function(tooltipItem) {
-                      const dataPoint = rectangleData[tooltipItem.dataIndex];
-                      return `最大値: ${dataPoint.y + dataPoint.height}, 最小値: ${dataPoint.y}`;
-                    }
-                  }
-                }
+                    label: function (tooltipItem) {
+                      if (tooltipItem.dataset.label === "範囲（最大値-最小値）") {
+                        const dataPoint = rectangleData[tooltipItem.dataIndex];
+                        return `最大値: ${dataPoint.y + dataPoint.height}, 最小値: ${dataPoint.y}`;
+                      }
+                      return null;
+                    },
+                  },
+                },
               },
               scales: {
                 x: {
@@ -138,7 +147,7 @@
                   },
                 },
               },
-            }
+            },
           });
         } else {
           document.body.innerHTML = `<p>Error: ${data.message}</p>`;
