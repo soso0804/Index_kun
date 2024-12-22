@@ -71,7 +71,7 @@
             if (date === today) {
               todayPoint.push({ x: date, y: maxPrice });
             } else {
-              barsData.push({ x: date, y: minPrice, height: maxPrice - minPrice });
+              barsData.push({ x: date, yMin: minPrice, yMax: maxPrice });
             }
           });
 
@@ -85,19 +85,17 @@
                   label: "範囲（最大値-最小値）",
                   data: barsData.map(item => ({
                     x: item.x,
-                    y: item.y,
+                    y: item.yMin, // 最小値を開始地点
+                    yMax: item.yMax, // 最大値を上辺
                   })),
-                  backgroundColor: barsData.map(item => {
-                    const barHeight = item.height;
-                    return barHeight > 0 ? "rgba(75, 192, 192, 0.5)" : "rgba(255, 255, 255, 0)";
-                  }),
+                  backgroundColor: "rgba(75, 192, 192, 0.5)",
                   borderColor: "rgba(75, 192, 192, 1)",
                   borderWidth: 1,
                   barPercentage: 1.0,
                   categoryPercentage: 0.8,
                 },
                 {
-                  label: "本日の値",
+                  label: "最新値",
                   type: "scatter",
                   data: todayPoint,
                   backgroundColor: "rgba(255, 99, 132, 1)",
@@ -114,9 +112,23 @@
                     label: function (tooltipItem) {
                       if (tooltipItem.dataset.label === "範囲（最大値-最小値）") {
                         const dataPoint = barsData[tooltipItem.dataIndex];
-                        return `最大値: ${dataPoint.y + dataPoint.height}, 最小値: ${dataPoint.y}`;
+                        return `最大値: ${dataPoint.yMax}, 最小値: ${dataPoint.yMin}`;
                       }
-                      return null;
+                      return null; // 最新値はツールチップを非表示
+                    },
+                  },
+                },
+                legend: {
+                  labels: {
+                    usePointStyle: true, // 凡例に丸を表示
+                    generateLabels: function (chart) {
+                      const data = chart.data.datasets;
+                      return data.map((dataset, index) => ({
+                        text: dataset.label,
+                        fillStyle: dataset.label === "最新値" ? "rgba(255, 99, 132, 1)" : dataset.backgroundColor,
+                        strokeStyle: dataset.borderColor,
+                        pointStyle: dataset.type === "scatter" ? "circle" : "rect",
+                      }));
                     },
                   },
                 },
