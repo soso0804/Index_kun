@@ -7,6 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
   <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -111,6 +112,13 @@
               scales: {
                 x: {
                   type: "time",
+                  adapters: {
+                    date: {
+                      displayFormats: {
+                        day: "YYYY-MM-DD"
+                      }
+                    }
+                  },
                   title: {
                     display: true,
                     text: "日付",
