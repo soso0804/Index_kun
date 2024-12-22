@@ -63,65 +63,62 @@
               .filter(item => item.date === date)
               .map(item => item.contractedPrice);
 
+            const high = Math.max(...dailyPrices);
+            const low = Math.min(...dailyPrices);
+
             return {
               date,
-              high: Math.max(...dailyPrices),
-              low: Math.min(...dailyPrices),
-              center: (Math.max(...dailyPrices) + Math.min(...dailyPrices)) / 2,
+              high,
+              low,
+              center: (high + low) / 2,
               isToday: date === today
             };
           });
 
-          // 今日のデータとそれ以外に分ける
-          const todayData = stockData.find(item => item.date === today && item.currentPrice);
-          const otherData = processedData.filter(item => !item.isToday);
-
-          // 折れ線データ（中心値を使用）
-          const centerLineData = otherData.map(item => item.center);
+          // 今日のデータを抽出
+          const todayData = stockData.find(item => item.date === today);
 
           // グラフデータを構築
-          const dataset = {
-            labels: processedData.map(item => item.date),
-            datasets: [
-              // 矩形データ (高値と安値で表示)
-              {
-                label: "過去の日付 (高値-安値)",
-                data: otherData.map(item => ({ x: item.date, y: item.center })),
-                backgroundColor: "rgba(75, 192, 192, 0.2)",
-                borderColor: "rgba(75, 192, 192, 0.5)",
-                borderWidth: 1,
-              },
-              // 今日の値 (点プロット)
-              {
-                label: "今日の値",
-                data: todayData ? [{ x: todayData.date, y: todayData.currentPrice }] : [],
-                backgroundColor: "rgba(255, 99, 132, 1)",
-                pointStyle: "circle",
-                radius: 6,
-                type: "scatter", // 点として表示
-              },
-              // 折れ線データ (中心値)
-              {
-                label: "中心値の折れ線",
-                data: centerLineData,
-                borderColor: "rgb(75, 75, 192)",
-                borderWidth: 2,
-                fill: false,
-                type: "line", // 折れ線グラフ
-              },
-            ],
-          };
+          const labels = processedData.map(item => item.date);
+          const highData = processedData.map(item => item.isToday ? null : item.high);
+          const lowData = processedData.map(item => item.isToday ? null : item.low);
+          const currentPriceData = todayData ? [todayData.currentPrice] : [];
 
           // Chart.jsで描画
           const ctx = document.getElementById("stockChart").getContext("2d");
           new Chart(ctx, {
-            type: "scatter", // デフォルトは点描画
-            data: dataset,
+            type: "bar",
+            data: {
+              labels: labels,
+              datasets: [
+                {
+                  label: "高値",
+                  data: highData,
+                  backgroundColor: "rgba(75, 192, 192, 0.2)",
+                  borderColor: "rgba(75, 192, 192, 1)",
+                  borderWidth: 1,
+                },
+                {
+                  label: "安値",
+                  data: lowData,
+                  backgroundColor: "rgba(192, 75, 75, 0.2)",
+                  borderColor: "rgba(192, 75, 75, 1)",
+                  borderWidth: 1,
+                },
+                {
+                  label: "今日の値",
+                  data: labels.map(date => date === today ? todayData.currentPrice : null),
+                  type: "scatter",
+                  backgroundColor: "rgba(255, 99, 132, 1)",
+                  pointStyle: "circle",
+                  radius: 6,
+                }
+              ],
+            },
             options: {
               responsive: true,
               scales: {
                 x: {
-                  type: "category",
                   title: {
                     display: true,
                     text: "日付",
