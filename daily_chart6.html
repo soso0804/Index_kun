@@ -53,8 +53,7 @@
           const stockData = data.data;
 
           const today = new Date().toISOString().split("T")[0];
-          const rectangleData = [];
-          const transparentData = [];
+          const barsData = [];
           const todayPoint = [];
 
           const groupedData = stockData.reduce((acc, item) => {
@@ -72,8 +71,7 @@
             if (date === today) {
               todayPoint.push({ x: date, y: maxPrice });
             } else {
-              rectangleData.push({ x: date, y: minPrice, height: maxPrice - minPrice });
-              transparentData.push({ x: date, y: maxPrice });
+              barsData.push({ x: date, y: minPrice, height: maxPrice - minPrice });
             }
           });
 
@@ -81,29 +79,20 @@
           new Chart(ctx, {
             type: "bar",
             data: {
-              labels: rectangleData.map(item => item.x),
+              labels: barsData.map(item => item.x),
               datasets: [
                 {
                   label: "範囲（最大値-最小値）",
-                  data: rectangleData.map(item => ({
+                  data: barsData.map(item => ({
                     x: item.x,
                     y: item.y,
                   })),
-                  backgroundColor: "rgba(75, 192, 192, 0.5)",
+                  backgroundColor: barsData.map(item => {
+                    const barHeight = item.height;
+                    return barHeight > 0 ? "rgba(75, 192, 192, 0.5)" : "rgba(255, 255, 255, 0)";
+                  }),
                   borderColor: "rgba(75, 192, 192, 1)",
                   borderWidth: 1,
-                  barPercentage: 1.0,
-                  categoryPercentage: 0.8,
-                },
-                {
-                  label: "透明な範囲",
-                  data: transparentData.map(item => ({
-                    x: item.x,
-                    y: item.y,
-                  })),
-                  backgroundColor: "rgba(255, 255, 255, 1)",
-                  borderColor: "rgba(255, 255, 255, 0)",
-                  borderWidth: 0,
                   barPercentage: 1.0,
                   categoryPercentage: 0.8,
                 },
@@ -124,7 +113,7 @@
                   callbacks: {
                     label: function (tooltipItem) {
                       if (tooltipItem.dataset.label === "範囲（最大値-最小値）") {
-                        const dataPoint = rectangleData[tooltipItem.dataIndex];
+                        const dataPoint = barsData[tooltipItem.dataIndex];
                         return `最大値: ${dataPoint.y + dataPoint.height}, 最小値: ${dataPoint.y}`;
                       }
                       return null;
@@ -145,6 +134,7 @@
                     display: true,
                     text: "価格",
                   },
+                  beginAtZero: false, // 最小値以下は表示しない
                 },
               },
             },
