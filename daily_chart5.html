@@ -59,28 +59,26 @@
           const rectangleData = [];
           const todayPoint = [];
 
+          // 同一日のデータをグループ化
           const groupedData = stockData.reduce((acc, item) => {
-            const date = item.date;
-            if (!acc[date]) {
-              acc[date] = [];
+            if (!acc[item.date]) {
+              acc[item.date] = [];
             }
-            acc[date].push(item.contractedPrice);
+            acc[item.date].push(item.contractedPrice);
             return acc;
           }, {});
 
+          // データを整形
           Object.entries(groupedData).forEach(([date, prices]) => {
+            const maxPrice = Math.max(...prices);
+            const minPrice = Math.min(...prices);
+
             if (date === today) {
-              // 今日の値を点としてプロット
-              todayPoint.push({
-                x: date,
-                y: Math.max(...prices),
-              });
+              // 本日の値
+              todayPoint.push({ x: date, y: maxPrice });
             } else {
-              rectangleData.push({
-                x: date,
-                yMin: Math.min(...prices),
-                yMax: Math.max(...prices),
-              });
+              // 四角形データ
+              rectangleData.push({ x: date, yMax: maxPrice, yMin: minPrice });
             }
           });
 
@@ -92,25 +90,64 @@
               labels: rectangleData.map(item => item.x),
               datasets: [
                 {
-                  label: "範囲 (最大-最小)",
+                  label: "範囲（最大値-最小値）",
                   data: rectangleData.map(item => ({
                     x: item.x,
-                    y: (item.yMin + item.yMax) / 2, // バーの位置は中央
+                    y: (item.yMax + item.yMin) / 2, // 四角形の中心
+                    yMax: item.yMax,
+                    yMin: item.yMin
                   })),
-                  backgroundColor: rectangleData.map(item =>
-                    `rgba(75, 192, 192, 0.5)` // 範囲のバーを表示
-                  ),
-                  yAxisID: "price",
+                  backgroundColor: "rgba(75, 192, 192, 0.2)",
+                  borderColor: "rgba(75, 192, 192, 1)",
+                  borderWidth: 1,
                 },
                 {
-                  label: "現在値",
+                  label: "本日の値",
                   type: "scatter",
                   data: todayPoint,
-                  borderWidth: 2,
-                  xCenter: -1000
+                  backgroundColor: "rgba(255, 99, 132, 1)",
+                  pointStyle: "circle",
+                  radius: 6,
                 },
-              ],
+              ]
             },
+            options: {
+              responsive: true,
+              plugins: {
+                tooltip: {
+                  callbacks: {
+                    label: function(tooltipItem) {
+                      const dataPoint = rectangleData[tooltipItem.dataIndex];
+                      return `最大値: ${dataPoint.yMax}, 最小値: ${dataPoint.yMin}`;
+                    }
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  type: "category",
+                  title: {
+                    display: true,
+                    text: "日付",
+                  },
+                },
+                y: {
+                  title: {
+                    display: true,
+                    text: "価格",
+                  },
+                },
+              },
+            }
           });
-        });
-      </>
+        } else {
+          document.body.innerHTML = `<p>Error: ${data.message}</p>`;
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching data:", error);
+        document.body.innerHTML = `<p>Error fetching data: ${error.message}</p>`;
+      });
+  </script>
+</body>
+</html>
