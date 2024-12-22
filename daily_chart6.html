@@ -53,7 +53,7 @@
           const stockData = data.data;
 
           const today = new Date().toISOString().split("T")[0];
-          const rectangles = [];
+          const barsData = [];
           const todayPoint = [];
 
           const groupedData = stockData.reduce((acc, item) => {
@@ -69,30 +69,30 @@
             const minPrice = Math.min(...prices);
 
             if (date === today) {
-              todayPoint.push({ x: date, y: stockData.find(item => item.date === date).currentPrice });
+              todayPoint.push({ x: date, y: maxPrice });
             } else {
-              rectangles.push({ x: date, min: minPrice, max: maxPrice });
+              barsData.push({ x: date, yMin: minPrice, yMax: maxPrice });
             }
           });
 
           const ctx = document.getElementById("stockChart").getContext("2d");
-
-          // Chart.jsで描画
           new Chart(ctx, {
             type: "bar",
             data: {
-              labels: rectangles.map(rect => rect.x),
+              labels: barsData.map(item => item.x),
               datasets: [
                 {
                   label: "範囲（最大値-最小値）",
-                  data: rectangles.map(rect => ({
-                    x: rect.x,
-                    y: rect.min,
-                    height: rect.max - rect.min,
+                  data: barsData.map(item => ({
+                    x: item.x,
+                    y: item.yMin, // 最小値を開始地点
+                    yMax: item.yMax, // 最大値を上辺
                   })),
                   backgroundColor: "rgba(75, 192, 192, 0.5)",
                   borderColor: "rgba(75, 192, 192, 1)",
                   borderWidth: 1,
+                  barPercentage: 1.0,
+                  categoryPercentage: 0.8,
                 },
                 {
                   label: "最新値",
@@ -111,10 +111,24 @@
                   callbacks: {
                     label: function (tooltipItem) {
                       if (tooltipItem.dataset.label === "範囲（最大値-最小値）") {
-                        const data = rectangles[tooltipItem.dataIndex];
-                        return `最大値: ${data.max}, 最小値: ${data.min}`;
+                        const dataPoint = barsData[tooltipItem.dataIndex];
+                        return `最大値: ${dataPoint.yMax}, 最小値: ${dataPoint.yMin}`;
                       }
-                      return `最新値: ${tooltipItem.raw.y}`;
+                      return null; // 最新値はツールチップを非表示
+                    },
+                  },
+                },
+                legend: {
+                  labels: {
+                    usePointStyle: true, // 凡例に丸を表示
+                    generateLabels: function (chart) {
+                      const data = chart.data.datasets;
+                      return data.map((dataset, index) => ({
+                        text: dataset.label,
+                        fillStyle: dataset.label === "最新値" ? "rgba(255, 99, 132, 1)" : dataset.backgroundColor,
+                        strokeStyle: dataset.borderColor,
+                        pointStyle: dataset.type === "scatter" ? "circle" : "rect",
+                      }));
                     },
                   },
                 },
@@ -132,7 +146,7 @@
                     display: true,
                     text: "価格",
                   },
-                  beginAtZero: false, // 最小値以下を非表示にする
+                  beginAtZero: false, // 最小値以下は表示しない
                 },
               },
             },
