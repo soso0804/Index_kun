@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>株価変動グラフ</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
   <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
   <style>
     body {
@@ -56,73 +57,67 @@
           // 今日の日付を取得
           const today = moment().format("YYYY-MM-DD");
 
-          // データ構造を整形
-          const dates = Array.from(new Set(stockData.map(item => item.date))); // 一意な日付リスト
-          const processedData = dates.map(date => {
-            const dailyPrices = stockData
-              .filter(item => item.date === date)
-              .map(item => item.contractedPrice);
+          // キャンドルスティックチャート用データを作成
+          const financialData = [];
+          const currentPriceData = [];
 
-            const high = Math.max(...dailyPrices);
-            const low = Math.min(...dailyPrices);
+          stockData.forEach(item => {
+            const date = item.date;
+            const contractedPrice = item.contractedPrice;
 
-            return {
-              date,
-              high,
-              low,
-              center: (high + low) / 2,
-              isToday: date === today
-            };
+            if (date === today) {
+              // 今日のデータはcurrentPriceを使って点をプロット
+              currentPriceData.push({
+                x: date,
+                y: item.currentPrice
+              });
+            } else {
+              // 過去の日付データ
+              const dailyPrices = stockData.filter(data => data.date === date).map(data => data.contractedPrice);
+              financialData.push({
+                x: date,
+                o: Math.min(...dailyPrices), // 開始値 (仮に最小値)
+                h: Math.max(...dailyPrices), // 高値
+                l: Math.min(...dailyPrices), // 安値
+                c: Math.max(...dailyPrices), // 終値 (仮に最大値)
+              });
+            }
           });
-
-          // 今日のデータを抽出
-          const todayData = stockData.find(item => item.date === today);
-
-          // グラフデータを構築
-          const labels = processedData.map(item => item.date);
-          const highData = processedData.map(item => item.isToday ? null : item.high);
-          const lowData = processedData.map(item => item.isToday ? null : item.low);
-          const currentPriceData = todayData ? [todayData.currentPrice] : [];
 
           // Chart.jsで描画
           const ctx = document.getElementById("stockChart").getContext("2d");
           new Chart(ctx, {
-            type: "bar",
+            type: "candlestick",
             data: {
-              labels: labels,
               datasets: [
                 {
-                  label: "高値",
-                  data: highData,
-                  backgroundColor: "rgba(75, 192, 192, 0.2)",
+                  label: "過去のデータ",
+                  data: financialData,
                   borderColor: "rgba(75, 192, 192, 1)",
-                  borderWidth: 1,
-                },
-                {
-                  label: "安値",
-                  data: lowData,
-                  backgroundColor: "rgba(192, 75, 75, 0.2)",
-                  borderColor: "rgba(192, 75, 75, 1)",
-                  borderWidth: 1,
+                  backgroundColor: "rgba(75, 192, 192, 0.2)",
                 },
                 {
                   label: "今日の値",
-                  data: labels.map(date => date === today ? todayData.currentPrice : null),
                   type: "scatter",
+                  data: currentPriceData,
                   backgroundColor: "rgba(255, 99, 132, 1)",
                   pointStyle: "circle",
                   radius: 6,
                 }
-              ],
+              ]
             },
             options: {
               responsive: true,
               scales: {
                 x: {
+                  type: "time",
                   title: {
                     display: true,
                     text: "日付",
                   },
+                  time: {
+                    unit: "day"
+                  }
                 },
                 y: {
                   title: {
@@ -131,7 +126,7 @@
                   },
                 },
               },
-            },
+            }
           });
         } else {
           document.body.innerHTML = `<p>Error: ${data.message}</p>`;
