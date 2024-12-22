@@ -53,9 +53,8 @@
           const stockData = data.data;
 
           const today = new Date().toISOString().split("T")[0];
-          const barsData = [];
-          const whiteBarsData = [];
-          const todayPoint = [];
+          const candlestickData = [];
+          const latestPrice = [];
 
           const groupedData = stockData.reduce((acc, item) => {
             if (!acc[item.date]) {
@@ -71,49 +70,35 @@
 
             if (date === today) {
               const currentPrice = stockData.find(item => item.date === date).currentPrice;
-              todayPoint.push({ x: date, y: currentPrice });
+              latestPrice.push({ x: date, y: currentPrice });
             } else {
-              barsData.push({ x: date, y: minPrice, max: maxPrice });
-              whiteBarsData.push({ x: date, y: 0, max: minPrice });
+              candlestickData.push({ x: date, max: maxPrice, min: minPrice });
             }
           });
 
           const ctx = document.getElementById("stockChart").getContext("2d");
 
-          // Chart.jsで描画
+          // カスタム描画で矩形を描画
           new Chart(ctx, {
             type: "bar",
             data: {
-              labels: barsData.map(item => item.x),
+              labels: candlestickData.map(item => item.x),
               datasets: [
-                // 白の矩形（0～最小値）
                 {
-                  label: "白い範囲",
-                  data: whiteBarsData.map(item => ({
+                  label: "株価範囲（最大値-最小値）",
+                  data: candlestickData.map(item => ({
                     x: item.x,
-                    y: item.y,
-                    max: item.max,
-                  })),
-                  backgroundColor: "rgba(255, 255, 255, 1)",
-                  borderWidth: 0,
-                },
-                // 緑の矩形（最小値～最大値）
-                {
-                  label: "範囲（最大値-最小値）",
-                  data: barsData.map(item => ({
-                    x: item.x,
-                    y: item.y,
-                    max: item.max,
+                    y: item.min,
+                    height: item.max - item.min,
                   })),
                   backgroundColor: "rgba(75, 192, 192, 0.5)",
                   borderColor: "rgba(75, 192, 192, 1)",
                   borderWidth: 1,
                 },
-                // 最新値（赤い丸）
                 {
                   label: "最新値",
                   type: "scatter",
-                  data: todayPoint,
+                  data: latestPrice,
                   backgroundColor: "rgba(255, 99, 132, 1)",
                   pointStyle: "circle",
                   radius: 6,
@@ -129,9 +114,9 @@
                       if (tooltipItem.dataset.label === "最新値") {
                         return `最新値: ${tooltipItem.raw.y}`;
                       }
-                      if (tooltipItem.dataset.label === "範囲（最大値-最小値）") {
-                        const dataPoint = barsData[tooltipItem.dataIndex];
-                        return `最大値: ${dataPoint.max}, 最小値: ${dataPoint.y}`;
+                      if (tooltipItem.dataset.label === "株価範囲（最大値-最小値）") {
+                        const dataPoint = candlestickData[tooltipItem.dataIndex];
+                        return `最大値: ${dataPoint.max}, 最小値: ${dataPoint.min}`;
                       }
                       return null;
                     },
@@ -151,7 +136,7 @@
                     display: true,
                     text: "価格",
                   },
-                  beginAtZero: true,
+                  beginAtZero: false,
                 },
               },
             },
