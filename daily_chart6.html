@@ -11,7 +11,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
       height: 100vh;
       margin: 0;
     }
@@ -19,11 +19,12 @@
     #chart-container {
       width: 90%;
       max-width: 800px;
+      height: 70vh; /* 縦方向をより大きく設定 */
     }
 
     canvas {
       width: 100%;
-      height: auto;
+      height: 100%; /* キャンバスを親要素にフィット */
     }
 
     #chart-title {
