@@ -72,7 +72,7 @@
               const currentPrice = stockData.find(item => item.date === date).currentPrice;
               latestPrice.push({ x: date, y: currentPrice });
             } else {
-              candlestickData.push({ x: date, max: maxPrice, min: minPrice });
+              candlestickData.push({ x: date, y: [minPrice, maxPrice] });
             }
           });
 
@@ -84,15 +84,15 @@
               labels: candlestickData.map(item => item.x),
               datasets: [
                 {
-                  label: "株価範囲（最大値-最小値）",
+                  label: "株価範囲（最小値-最大値）",
                   data: candlestickData.map(item => ({
                     x: item.x,
-                    y: item.min,
-                    height: item.max - item.min,
+                    y: item.y,
                   })),
                   backgroundColor: "rgba(75, 192, 192, 0.5)",
                   borderColor: "rgba(75, 192, 192, 1)",
                   borderWidth: 1,
+                  barPercentage: 0.6,
                 },
                 {
                   label: "最新値",
@@ -113,9 +113,9 @@
                       if (tooltipItem.dataset.label === "最新値") {
                         return `最新値: ${tooltipItem.raw.y}`;
                       }
-                      if (tooltipItem.dataset.label === "株価範囲（最大値-最小値）") {
+                      if (tooltipItem.dataset.label === "株価範囲（最小値-最大値）") {
                         const dataPoint = candlestickData[tooltipItem.dataIndex];
-                        return `最大値: ${dataPoint.max}, 最小値: ${dataPoint.min}`;
+                        return `最小値: ${dataPoint.y[0]}, 最大値: ${dataPoint.y[1]}`;
                       }
                       return null;
                     },
@@ -123,12 +123,12 @@
                 },
                 legend: {
                   labels: {
-                    usePointStyle: true, // 赤丸の凡例を保持
+                    usePointStyle: true,
                     generateLabels: function (chart) {
                       const data = chart.data.datasets;
                       return data.map((dataset, index) => ({
                         text: dataset.label,
-                        fillStyle: dataset.label === "最新値" ? "rgba(255, 99, 132, 1)" : dataset.backgroundColor,
+                        fillStyle: dataset.label === "最新値" ? "rgba(255, 99, 132, 1)" : "rgba(75, 192, 192, 0.5)",
                         strokeStyle: dataset.borderColor,
                         pointStyle: dataset.label === "最新値" ? "circle" : "rect",
                       }));
