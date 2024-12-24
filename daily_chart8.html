@@ -50,10 +50,6 @@
         if (data.status === "success") {
           const stockData = data.data;
 
-          const today = new Date().toISOString().split("T")[0];
-          const candlestickData = [];
-          const latestPrice = [];
-
           const groupedData = stockData.reduce((acc, item) => {
             if (!acc[item.date]) {
               acc[item.date] = [];
@@ -62,14 +58,26 @@
             return acc;
           }, {});
 
-          Object.entries(groupedData).forEach(([date, prices]) => {
+          const sortedDates = Object.keys(groupedData).sort((a, b) => new Date(a) - new Date(b));
+          const latestDates = sortedDates.slice(-7);
+          const candlestickData = [];
+          const latestPrice = [];
+          const medianLine = [];
+
+          latestDates.forEach((date, index) => {
+            const prices = groupedData[date];
             const maxPrice = Math.max(...prices);
             const minPrice = Math.min(...prices);
+            const medianPrice = (maxPrice + minPrice) / 2;
 
-            if (date === today) {
+            medianLine.push({ x: date, y: medianPrice });
+
+            if (index === latestDates.length - 1) {
+              // 最新の日付のデータはcurrentPriceを使用
               const currentPrice = stockData.find(item => item.date === date).currentPrice;
               latestPrice.push({ x: date, y: currentPrice });
             } else {
+              // 他の日付はcontractedPriceを棒グラフとして表示
               candlestickData.push({ x: date, y: [minPrice, maxPrice] });
             }
           });
@@ -79,7 +87,7 @@
           new Chart(ctx, {
             type: "bar",
             data: {
-              labels: candlestickData.map(item => item.x),
+              labels: latestDates,
               datasets: [
                 {
                   label: "株価範囲（最小値-最大値）",
@@ -100,6 +108,15 @@
                   pointStyle: "circle",
                   radius: 6,
                 },
+                {
+                  label: "中央値",
+                  type: "line",
+                  data: medianLine.map(item => ({ x: item.x, y: item.y })),
+                  borderColor: "rgba(54, 162, 235, 1)",
+                  borderWidth: 2,
+                  fill: false,
+                  tension: 0.1,
+                }
               ],
             },
             options: {
@@ -112,8 +129,11 @@
                         return `最新値: ${tooltipItem.raw.y}`;
                       }
                       if (tooltipItem.dataset.label === "株価範囲（最小値-最大値）") {
-                        const dataPoint = candlestickData[tooltipItem.dataIndex];
+                        const dataPoint = candlestickData.find(item => item.x === tooltipItem.label);
                         return `最小値: ${dataPoint.y[0]}, 最大値: ${dataPoint.y[1]}`;
+                      }
+                      if (tooltipItem.dataset.label === "中央値") {
+                        return `中央値: ${tooltipItem.raw.y}`;
                       }
                       return null;
                     },
@@ -126,9 +146,9 @@
                       const data = chart.data.datasets;
                       return data.map((dataset, index) => ({
                         text: dataset.label,
-                        fillStyle: dataset.label === "最新値" ? "rgba(255, 99, 132, 1)" : "rgba(75, 192, 192, 0.5)",
+                        fillStyle: dataset.label === "最新値" ? "rgba(255, 99, 132, 1)" : dataset.label === "中央値" ? "rgba(54, 162, 235, 1)" : "rgba(75, 192, 192, 0.5)",
                         strokeStyle: dataset.borderColor,
-                        pointStyle: dataset.label === "最新値" ? "circle" : "rect",
+                        pointStyle: dataset.label === "最新値" ? "circle" : dataset.label === "中央値" ? "line" : "rect",
                       }));
                     },
                   },
