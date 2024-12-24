@@ -73,7 +73,10 @@
             medianLine.push({ x: date, y: medianPrice });
 
             if (index === latestDates.length - 1) {
-              // 最新の日付のデータはcurrentPriceを使用
+              // 最新の日付のデータに棒グラフを追加
+              candlestickData.push({ x: date, y: [minPrice, maxPrice] });
+
+              // 最新の日付のcurrentPriceをプロット
               const currentPrice = stockData.find(item => item.date === date).currentPrice;
               latestPrice.push({ x: date, y: currentPrice });
             } else {
