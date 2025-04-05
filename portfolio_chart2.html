@@ -1,121 +1,74 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Portfolio Chart</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    /* 全体レイアウト調整 */
-    body {
-      margin: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      height: 100vh; /* 全体を画面サイズに合わせる */
-      box-sizing: border-box;
+.then(data => {
+  if (data.status === "success") {
+    let portfolioData = data.data;
+
+    // データが空のとき
+    if (portfolioData.length === 0) {
+      document.getElementById('chart-container').innerHTML = "<p style='text-align:center;'>まだ株を持っていません。</p>";
+      return;
     }
 
-    #chart-container {
-      width: 90%; /* 横幅の余白を持たせる */
-      max-width: 400px; /* 最大幅を設定 */
+    // totalStockの多い順にソート
+    portfolioData = portfolioData.sort((a, b) => b.totalStock - a.totalStock);
+
+    // 上位6社と「その他」を分ける
+    const top6 = portfolioData.slice(0, 6);
+    const others = portfolioData.slice(6);
+
+    const labels = top6.map(item => item.companyName);
+    const stockValues = top6.map(item => parseInt(item.totalStock, 10));
+    
+    // 「その他」の合計を計算
+    const othersTotal = others.reduce((sum, item) => sum + parseInt(item.totalStock, 10), 0);
+    if (othersTotal > 0) {
+      labels.push("その他");
+      stockValues.push(othersTotal);
     }
 
-    canvas {
-      width: 100%;
-      height: auto;
-    }
-  </style>
-</head>
-<body>
-  <div id="chart-container">
-    <canvas id="portfolioChart"></canvas>
-  </div>
-  <script>
-    // ユーザーのデータをAPIから取得
-    const queryString = window.location.search; // URLのクエリパラメータ
-    const urlParams = new URLSearchParams(queryString);
-    const userName = urlParams.get('userName'); // userNameの取得
-    const apiUrl = "https://script.google.com/macros/s/AKfycbxIZOnDYvU4wn87kALQAp66Z-SAMvXNCpEU4GgTcyYqyHhoTQE0CgRFECVpGfjLL6Zh/exec?action=getUserPortfolio&userName=" + userName;
+    const backgroundColors = [
+      '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#D3D3D3'
+    ];
 
-    if (!userName) {
-      document.body.innerHTML = "<p>Error: No userName provided in the URL. Please add ?userName=your-email@example.com to the URL.</p>";
-      console.error("Error: No userName provided in the URL.");
-    } else {
-      fetch(apiUrl)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-          }
-          return response.json();
-        })
-        .then(data => {
-          if (data.status === "success") {
-            let portfolioData = data.data;
-
-            // totalStockの多い順にソート
-            portfolioData = portfolioData.sort((a, b) => b.totalStock - a.totalStock);
-
-            // ソートされたデータからラベルと値を抽出
-            const labels = portfolioData.map(item => item.companyName);
-            const stockValues = portfolioData.map(item => parseInt(item.totalStock, 10));
-
-            // 多種類の背景色を設定
-            const backgroundColors = [
-              '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40',
-              '#E6B0AA', '#A9CCE3', '#F9E79F', '#76D7C4', '#BB8FCE', '#F1948A',
-              '#A3E4D7', '#85C1E9', '#F7DC6F', '#F5B7B1', '#D5DBDB', '#FAD7A0'
-            ];
-
-            // グラフを描画
-            const ctx = document.getElementById('portfolioChart').getContext('2d');
-            new Chart(ctx, {
-              type: 'pie',
-              data: {
-                labels: labels,
-                datasets: [{
-                  label: '持ち株数', // ツールチップに表示されるラベル
-                  data: stockValues,
-                  backgroundColor: backgroundColors,
-                  borderWidth: 1
-                }]
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false, // キャンバスのアスペクト比をカスタマイズ可能に
-                plugins: {
-                  legend: {
-                    position: 'bottom', // 凡例を下に配置
-                    labels: {
-                      font: {
-                        size: 12 // 凡例の文字サイズを調整
-                      }
-                    }
-                  },
-                  tooltip: {
-                    callbacks: {
-                      label: function(tooltipItem) {
-                        const dataIndex = tooltipItem.dataIndex;
-                        const stock = stockValues[dataIndex];
-                        const label = labels[dataIndex];
-                        return `持ち株数：${stock}株`; // ツールチップの内容を修正
-                      }
-                    }
-                  }
-                }
+    const ctx = document.getElementById('portfolioChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '持ち株数',
+          data: stockValues,
+          backgroundColor: backgroundColors,
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              font: {
+                size: 12
               }
-            });
-          } else {
-            document.body.innerHTML = `<p>Error: ${data.message}</p>`;
-            console.error("API Error:", data.message);
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(tooltipItem) {
+                const dataIndex = tooltipItem.dataIndex;
+                const stock = stockValues[dataIndex];
+                const label = labels[dataIndex];
+                return `持ち株数：${stock}株`;
+              }
+            }
           }
-        })
-        .catch(error => {
-          document.body.innerHTML = `<p>Error fetching data: ${error.message}</p>`;
-          console.error("Error fetching data:", error);
-        });
-    }
-  </script>
-</body>
-</html>
+        }
+      }
+    });
+  } else {
+    document.body.innerHTML = `<p>Error: ${data.message}</p>`;
+    console.error("API Error:", data.message);
+  }
+})
+
