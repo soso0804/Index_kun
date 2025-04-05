@@ -42,7 +42,7 @@
     const apiUrl = "https://script.google.com/macros/s/AKfycbxIZOnDYvU4wn87kALQAp66Z-SAMvXNCpEU4GgTcyYqyHhoTQE0CgRFECVpGfjLL6Zh/exec?action=getUserPortfolio&userName=" + userName;
 
     if (!userName) {
-      document.body.innerHTML = "<p class='message'>エラー：URLに「?userName=〜」がありません。</p>";
+      document.getElementById('chart-container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
       console.error("Error: No userName provided in the URL.");
     } else {
       fetch(apiUrl)
@@ -56,7 +56,6 @@
           if (data.status === "success") {
             let portfolioData = data.data;
 
-            // データが空ならメッセージ表示
             if (!portfolioData || portfolioData.length === 0) {
               document.getElementById('chart-container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
               return;
@@ -120,8 +119,12 @@
               }
             });
           } else {
-            document.body.innerHTML = `<p class='message'>エラー：${data.message}</p>`;
-            console.error("API Error:", data.message);
+            if (data.message && data.message.includes("No data found")) {
+              document.getElementById('chart-container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
+            } else {
+              document.body.innerHTML = `<p class='message'>エラー：${data.message}</p>`;
+              console.error("API Error:", data.message);
+            }
           }
         })
         .catch(error => {
@@ -132,3 +135,4 @@
   </script>
 </body>
 </html>
+
