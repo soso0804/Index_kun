@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>portfolio_chart</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      height: 100vh;
+      box-sizing: border-box;
+      font-family: sans-serif;
+    }
+    #chart_container {
+      width: 90%;
+      max-width: 400px;
+    }
+    canvas {
+      width: 100%;
+      height: auto;
+    }
+    .message {
+      text-align: center;
+      font-size: 18px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div id="chart_container">
+    <canvas id="portfolio_chart"></canvas>
+  </div>
+  <script>
+    const query_string = window.location.search;
+    const url_params = new URLSearchParams(query_string);
+    const user_name = url_params.get('user_name');
+    const api_url = `https://your-project-name.supabase.co/functions/v1/get_user_portfolio?user_name=${user_name}`;
+
+    if (!user_name) {
+      document.getElementById('chart_container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
+      console.error("Error: No user_name provided in the URL.");
+    } else {
+      fetch(api_url)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.status === "success") {
+            let portfolio_data = data.data;
+
+            if (!portfolio_data || portfolio_data.length === 0) {
+              document.getElementById('chart_container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
+              return;
+            }
+
+            portfolio_data = portfolio_data.sort((a, b) => b.total_stock - a.total_stock);
+
+            const top6 = portfolio_data.slice(0, 6);
+            const others = portfolio_data.slice(6);
+
+            const labels = top6.map(item => item.company_name);
+            const stock_values = top6.map(item => parseInt(item.total_stock, 10));
+
+            const others_total = others.reduce((sum, item) => sum + parseInt(item.total_stock, 10), 0);
+            if (others_total > 0) {
+              labels.push("その他");
+              stock_values.push(others_total);
+            }
+
+            const background_colors = [
+              '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#D3D3D3'
+            ];
+
+            const ctx = document.getElementById('portfolio_chart').getContext('2d');
+            new Chart(ctx, {
+              type: 'pie',
+              data: {
+                labels: labels,
+                datasets: [{
+                  label: '持ち株数',
+                  data: stock_values,
+                  backgroundColor: background_colors,
+                  borderWidth: 1
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: 'bottom',
+                    labels: {
+                      font: {
+                        size: 12
+                      }
+                    }
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function (tooltip_item) {
+                        const index = tooltip_item.dataIndex;
+                        const stock = stock_values[index];
+                        return `持ち株数：${stock}株`;
+                      }
+                    }
+                  }
+                }
+              }
+            });
+          } else {
+            if (data.message && data.message.includes("No data found")) {
+              document.getElementById('chart_container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
+            } else {
+              document.body.innerHTML = `<p class='message'>エラー：${data.message}</p>`;
+              console.error("API Error:", data.message);
+            }
+          }
+        })
+        .catch(error => {
+          document.body.innerHTML = `<p class='message'>データ取得エラー：${error.message}</p>`;
+          console.error("Error fetching data:", error);
+        });
+    }
+  </script>
+</body>
+</html>
