@@ -35,9 +35,9 @@
   <script>
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
-    const companyName = urlParams.get("company_name");
+    const company_name = urlParams.get("company_name");
 
-    if (!companyName) {
+    if (!company_name) {
       document.body.innerHTML = "<p>Error: company_name parameter is missing in the URL.</p>";
       throw new Error("Missing company_name parameter.");
     }
