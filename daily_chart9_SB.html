@@ -15,13 +15,11 @@
       height: 100vh;
       margin: 0;
     }
-
     #chart-container {
       width: 100%;
       max-width: 1000px;
       height: 90vh;
     }
-
     canvas {
       width: 100%;
       height: 100%;
@@ -33,6 +31,11 @@
     <canvas id="stockChart"></canvas>
   </div>
   <script>
+    const toJST = (utcDateStr) => {
+      const date = new Date(utcDateStr);
+      return date.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    };
+
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     const company_name = urlParams.get("company_name");
@@ -50,11 +53,13 @@
         if (data.status === "success") {
           const stockData = data.data;
 
+          // 日付ごとに価格をグループ化
           const groupedData = stockData.reduce((acc, item) => {
-            if (!acc[item.date]) {
-              acc[item.date] = [];
+            const jstDate = toJST(item.date);
+            if (!acc[jstDate]) {
+              acc[jstDate] = [];
             }
-            acc[item.date].push(item.contracted_price);
+            acc[jstDate].push(item);
             return acc;
           }, {});
 
@@ -65,20 +70,19 @@
           const medianLine = [];
 
           latestDates.forEach((date, index) => {
-            const prices = groupedData[date];
+            const items = groupedData[date];
+            const prices = items.map(i => i.contracted_price);
             const maxPrice = Math.max(...prices);
             const minPrice = Math.min(...prices);
             const medianPrice = (maxPrice + minPrice) / 2;
 
             medianLine.push({ x: date, y: medianPrice });
 
-            if (index === latestDates.length - 1) {
-              candlestickData.push({ x: date, y: [minPrice, maxPrice] });
+            candlestickData.push({ x: date, y: [minPrice, maxPrice] });
 
-              const currentPrice = stockData.find(item => item.date === date).current_price;
+            if (index === latestDates.length - 1) {
+              const currentPrice = items[0].current_price;
               latestPrice.push({ x: date, y: currentPrice });
-            } else {
-              candlestickData.push({ x: date, y: [minPrice, maxPrice] });
             }
           });
 
@@ -125,14 +129,13 @@
                 tooltip: {
                   callbacks: {
                     label: function (tooltipItem) {
-                      if (tooltipItem.dataset.label === "最新値") {
+                      const label = tooltipItem.dataset.label;
+                      const dataPoint = candlestickData.find(item => item.x === tooltipItem.label);
+                      if (label === "最新値") {
                         return `最新値: ${tooltipItem.raw.y}`;
-                      }
-                      if (tooltipItem.dataset.label === "株価範囲（最小値-最大値）") {
-                        const dataPoint = candlestickData.find(item => item.x === tooltipItem.label);
+                      } else if (label === "株価範囲（最小値-最大値）") {
                         return `最小値: ${dataPoint.y[0]}, 最大値: ${dataPoint.y[1]}`;
-                      }
-                      if (tooltipItem.dataset.label === "中央値") {
+                      } else if (label === "中央値") {
                         return `中央値: ${tooltipItem.raw.y}`;
                       }
                       return null;
@@ -143,8 +146,7 @@
                   labels: {
                     usePointStyle: true,
                     generateLabels: function (chart) {
-                      const data = chart.data.datasets;
-                      return data.map((dataset) => ({
+                      return chart.data.datasets.map((dataset) => ({
                         text: dataset.label,
                         fillStyle:
                           dataset.label === "最新値"
