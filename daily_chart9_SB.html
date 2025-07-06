@@ -35,11 +35,11 @@
   <script>
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
-    const companyName = urlParams.get("companyName");
+    const companyName = urlParams.get("company_name");
 
     if (!companyName) {
-      document.body.innerHTML = "<p>Error: companyName parameter is missing in the URL.</p>";
-      throw new Error("Missing companyName parameter.");
+      document.body.innerHTML = "<p>Error: company_name parameter is missing in the URL.</p>";
+      throw new Error("Missing company_name parameter.");
     }
 
     const apiUrl = `https://ddtszhkycoqnffgciucl.supabase.co/functions/v1/GetSheetDataForDailyChart_v1?company_name=${encodeURIComponent(company_name)}`;
