@@ -1,1 +1,188 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>株価チャート</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      height: 100vh;
+      margin: 0;
+    }
 
+    #chart-container {
+      width: 100%;
+      max-width: 1000px;
+      height: 90vh; /* グラフをより大きく表示 */
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%; /* キャンバスを親要素にフィット */
+    }
+  </style>
+</head>
+<body>
+  <div id="chart-container">
+    <canvas id="stockChart"></canvas>
+  </div>
+  <script>
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    const companyName = urlParams.get("companyName");
+
+    if (!companyName) {
+      document.body.innerHTML = "<p>Error: companyName parameter is missing in the URL.</p>";
+      throw new Error("Missing companyName parameter.");
+    }
+
+    const apiUrl = `https://ddtszhkycoqnffgciucl.supabase.co/functions/v1/GetSheetDataForDailyChart_v1?company_name=${encodeURIComponent(company_name)}`;
+
+    fetch(apiUrl)
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.status === "success") {
+          const stockData = data.data;
+
+          const groupedData = stockData.reduce((acc, item) => {
+            if (!acc[item.date]) {
+              acc[item.date] = [];
+            }
+            acc[item.date].push(item.contractedPrice);
+            return acc;
+          }, {});
+
+          const sortedDates = Object.keys(groupedData).sort((a, b) => new Date(a) - new Date(b));
+          const latestDates = sortedDates.slice(-7);
+          const candlestickData = [];
+          const latestPrice = [];
+          const medianLine = [];
+
+          latestDates.forEach((date, index) => {
+            const prices = groupedData[date];
+            const maxPrice = Math.max(...prices);
+            const minPrice = Math.min(...prices);
+            const medianPrice = (maxPrice + minPrice) / 2;
+
+            medianLine.push({ x: date, y: medianPrice });
+
+            if (index === latestDates.length - 1) {
+              // 最新の日付のデータに棒グラフを追加
+              candlestickData.push({ x: date, y: [minPrice, maxPrice] });
+
+              // 最新の日付のcurrentPriceをプロット
+              const currentPrice = stockData.find(item => item.date === date).currentPrice;
+              latestPrice.push({ x: date, y: currentPrice });
+            } else {
+              // 他の日付はcontractedPriceを棒グラフとして表示
+              candlestickData.push({ x: date, y: [minPrice, maxPrice] });
+            }
+          });
+
+          const ctx = document.getElementById("stockChart").getContext("2d");
+
+          new Chart(ctx, {
+            type: "bar",
+            data: {
+              labels: latestDates,
+              datasets: [
+                {
+                  label: "株価範囲（最小値-最大値）",
+                  data: candlestickData.map(item => ({
+                    x: item.x,
+                    y: item.y,
+                  })),
+                  backgroundColor: "rgba(75, 192, 192, 0.5)",
+                  borderColor: "rgba(75, 192, 192, 1)",
+                  borderWidth: 1,
+                  barPercentage: 0.6,
+                },
+                {
+                  label: "最新値",
+                  type: "scatter",
+                  data: latestPrice,
+                  backgroundColor: "rgba(255, 99, 132, 1)",
+                  pointStyle: "circle",
+                  radius: 6,
+                },
+                {
+                  label: "中央値",
+                  type: "line",
+                  data: medianLine.map(item => ({ x: item.x, y: item.y })),
+                  borderColor: "rgba(54, 162, 235, 1)",
+                  borderWidth: 2,
+                  fill: false,
+                  tension: 0.1,
+                }
+              ],
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                tooltip: {
+                  callbacks: {
+                    label: function (tooltipItem) {
+                      if (tooltipItem.dataset.label === "最新値") {
+                        return `最新値: ${tooltipItem.raw.y}`;
+                      }
+                      if (tooltipItem.dataset.label === "株価範囲（最小値-最大値）") {
+                        const dataPoint = candlestickData.find(item => item.x === tooltipItem.label);
+                        return `最小値: ${dataPoint.y[0]}, 最大値: ${dataPoint.y[1]}`;
+                      }
+                      if (tooltipItem.dataset.label === "中央値") {
+                        return `中央値: ${tooltipItem.raw.y}`;
+                      }
+                      return null;
+                    },
+                  },
+                },
+                legend: {
+                  labels: {
+                    usePointStyle: true,
+                    generateLabels: function (chart) {
+                      const data = chart.data.datasets;
+                      return data.map((dataset, index) => ({
+                        text: dataset.label,
+                        fillStyle: dataset.label === "最新値" ? "rgba(255, 99, 132, 1)" : dataset.label === "中央値" ? "rgba(54, 162, 235, 1)" : "rgba(75, 192, 192, 0.5)",
+                        strokeStyle: dataset.borderColor,
+                        pointStyle: dataset.label === "最新値" ? "circle" : dataset.label === "中央値" ? "line" : "rect",
+                      }));
+                    },
+                  },
+                },
+              },
+              scales: {
+                x: {
+                  type: "category",
+                  title: {
+                    display: true,
+                    text: "日付",
+                  },
+                },
+                y: {
+                  title: {
+                    display: true,
+                    text: "価格",
+                  },
+                  beginAtZero: false,
+                },
+              },
+            },
+          });
+        } else {
+          document.body.innerHTML = `<p>Error: ${data.message}</p>`;
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching data:", error);
+        document.body.innerHTML = `<p>Error fetching data: ${error.message}</p>`;
+      });
+  </script>
+</body>
+</html>
