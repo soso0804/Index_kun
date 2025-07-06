@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>portfolio_chart</title>
+  <title>Portfolio Chart</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
@@ -16,7 +16,7 @@
       box-sizing: border-box;
       font-family: sans-serif;
     }
-    #chart_container {
+    #chart-container {
       width: 90%;
       max-width: 400px;
     }
@@ -32,20 +32,20 @@
   </style>
 </head>
 <body>
-  <div id="chart_container">
-    <canvas id="portfolio_chart"></canvas>
+  <div id="chart-container">
+    <canvas id="portfolioChart"></canvas>
   </div>
   <script>
-    const query_string = window.location.search;
-    const url_params = new URLSearchParams(query_string);
-    const user_name = url_params.get('user_name');
-    const api_url = `https://ddtszhkycoqnffgciucl.supabase.co/functions/v1/GetSheetDataForPieChart_v1?user_name=${user_name}`;
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    const user_name = urlParams.get('user_name');
+    const apiUrl = `https://ddtszhkycoqnffgciucl.supabase.co/functions/v1/get_user_portfolio?user_name=${user_name}`;
 
     if (!user_name) {
-      document.getElementById('chart_container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
+      document.getElementById('chart-container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
       console.error("Error: No user_name provided in the URL.");
     } else {
-      fetch(api_url)
+      fetch(apiUrl)
         .then(response => {
           if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
@@ -54,40 +54,42 @@
         })
         .then(data => {
           if (data.status === "success") {
-            let portfolio_data = data.data;
+            let portfolioData = data.data;
 
-            if (!portfolio_data || portfolio_data.length === 0) {
-              document.getElementById('chart_container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
+            if (!portfolioData || portfolioData.length === 0) {
+              document.getElementById('chart-container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
               return;
             }
 
-            portfolio_data = portfolio_data.sort((a, b) => b.total_stock - a.total_stock);
+            // total_stock の多い順にソート
+            portfolioData = portfolioData.sort((a, b) => b.total_stock - a.total_stock);
 
-            const top6 = portfolio_data.slice(0, 6);
-            const others = portfolio_data.slice(6);
+            // 上位6社とその他に分類
+            const top6 = portfolioData.slice(0, 6);
+            const others = portfolioData.slice(6);
 
             const labels = top6.map(item => item.company_name);
-            const stock_values = top6.map(item => parseInt(item.total_stock, 10));
+            const stockValues = top6.map(item => parseInt(item.total_stock, 10));
 
-            const others_total = others.reduce((sum, item) => sum + parseInt(item.total_stock, 10), 0);
-            if (others_total > 0) {
+            const othersTotal = others.reduce((sum, item) => sum + parseInt(item.total_stock, 10), 0);
+            if (othersTotal > 0) {
               labels.push("その他");
-              stock_values.push(others_total);
+              stockValues.push(othersTotal);
             }
 
-            const background_colors = [
+            const backgroundColors = [
               '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#D3D3D3'
             ];
 
-            const ctx = document.getElementById('portfolio_chart').getContext('2d');
+            const ctx = document.getElementById('portfolioChart').getContext('2d');
             new Chart(ctx, {
               type: 'pie',
               data: {
                 labels: labels,
                 datasets: [{
                   label: '持ち株数',
-                  data: stock_values,
-                  backgroundColor: background_colors,
+                  data: stockValues,
+                  backgroundColor: backgroundColors,
                   borderWidth: 1
                 }]
               },
@@ -105,9 +107,10 @@
                   },
                   tooltip: {
                     callbacks: {
-                      label: function (tooltip_item) {
-                        const index = tooltip_item.dataIndex;
-                        const stock = stock_values[index];
+                      label: function (tooltipItem) {
+                        const dataIndex = tooltipItem.dataIndex;
+                        const stock = stockValues[dataIndex];
+                        const label = labels[dataIndex];
                         return `持ち株数：${stock}株`;
                       }
                     }
@@ -117,7 +120,7 @@
             });
           } else {
             if (data.message && data.message.includes("No data found")) {
-              document.getElementById('chart_container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
+              document.getElementById('chart-container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
             } else {
               document.body.innerHTML = `<p class='message'>エラー：${data.message}</p>`;
               console.error("API Error:", data.message);
