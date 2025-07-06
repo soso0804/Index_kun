@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>株価チャート</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -19,12 +19,12 @@
     #chart-container {
       width: 100%;
       max-width: 1000px;
-      height: 90vh; /* グラフをより大きく表示 */
+      height: 90vh;
     }
 
     canvas {
       width: 100%;
-      height: 100%; /* キャンバスを親要素にフィット */
+      height: 100%;
     }
   </style>
 </head>
@@ -54,7 +54,7 @@
             if (!acc[item.date]) {
               acc[item.date] = [];
             }
-            acc[item.date].push(item.contractedPrice);
+            acc[item.date].push(item.contracted_price);
             return acc;
           }, {});
 
@@ -73,14 +73,11 @@
             medianLine.push({ x: date, y: medianPrice });
 
             if (index === latestDates.length - 1) {
-              // 最新の日付のデータに棒グラフを追加
               candlestickData.push({ x: date, y: [minPrice, maxPrice] });
 
-              // 最新の日付のcurrentPriceをプロット
-              const currentPrice = stockData.find(item => item.date === date).currentPrice;
+              const currentPrice = stockData.find(item => item.date === date).current_price;
               latestPrice.push({ x: date, y: currentPrice });
             } else {
-              // 他の日付はcontractedPriceを棒グラフとして表示
               candlestickData.push({ x: date, y: [minPrice, maxPrice] });
             }
           });
@@ -147,11 +144,21 @@
                     usePointStyle: true,
                     generateLabels: function (chart) {
                       const data = chart.data.datasets;
-                      return data.map((dataset, index) => ({
+                      return data.map((dataset) => ({
                         text: dataset.label,
-                        fillStyle: dataset.label === "最新値" ? "rgba(255, 99, 132, 1)" : dataset.label === "中央値" ? "rgba(54, 162, 235, 1)" : "rgba(75, 192, 192, 0.5)",
+                        fillStyle:
+                          dataset.label === "最新値"
+                            ? "rgba(255, 99, 132, 1)"
+                            : dataset.label === "中央値"
+                            ? "rgba(54, 162, 235, 1)"
+                            : "rgba(75, 192, 192, 0.5)",
                         strokeStyle: dataset.borderColor,
-                        pointStyle: dataset.label === "最新値" ? "circle" : dataset.label === "中央値" ? "line" : "rect",
+                        pointStyle:
+                          dataset.label === "最新値"
+                            ? "circle"
+                            : dataset.label === "中央値"
+                            ? "line"
+                            : "rect",
                       }));
                     },
                   },
