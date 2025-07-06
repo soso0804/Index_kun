@@ -39,7 +39,7 @@
     const query_string = window.location.search;
     const url_params = new URLSearchParams(query_string);
     const user_name = url_params.get('user_name');
-    const api_url = `https://your-project-name.supabase.co/functions/v1/get_user_portfolio?user_name=${user_name}`;
+    const api_url = `https://ddtszhkycoqnffgciucl.supabase.co/functions/v1/GetSheetDataForPieChart_v1?user_name=${user_name}`;
 
     if (!user_name) {
       document.getElementById('chart_container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
