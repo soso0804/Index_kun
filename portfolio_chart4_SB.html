@@ -42,7 +42,7 @@
     const apiUrl = `https://ddtszhkycoqnffgciucl.supabase.co/functions/v1/GetSheetDataForPieChart_v1?user_name=${user_name}`;
 
     if (!user_name) {
-      document.getElementById('chart-container').innerHTML = "<p class='message'>まだ株を持っていませんの。</p>";
+      document.getElementById('chart-container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
       console.error("Error: No user_name provided in the URL.");
     } else {
       fetch(apiUrl)
@@ -57,7 +57,7 @@
             let portfolioData = data.data;
 
             if (!portfolioData || portfolioData.length === 0) {
-              document.getElementById('chart-container').innerHTML = "<p class='message'>まだ株を持っていませんよ。</p>";
+              document.getElementById('chart-container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
               return;
             }
 
@@ -120,7 +120,7 @@
             });
           } else {
             if (data.message && data.message.includes("No data found")) {
-              document.getElementById('chart-container').innerHTML = "<p class='message'>まだ株を持っていませっmん。</p>";
+              document.getElementById('chart-container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
             } else {
               document.body.innerHTML = `<p class='message'>エラー：${data.message}</p>`;
               console.error("API Error:", data.message);
