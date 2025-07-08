@@ -53,7 +53,6 @@
         if (data.status === "success") {
           const stockData = data.data;
 
-          // JST日付ごとに価格をグループ化
           const groupedData = stockData.reduce((acc, item) => {
             const jstDate = toJST(item.date);
             if (!acc[jstDate]) {
@@ -65,25 +64,27 @@
 
           const sortedDates = Object.keys(groupedData).sort((a, b) => new Date(a) - new Date(b));
           const latestDates = sortedDates.slice(-7);
+
           const candlestickData = [];
           const latestPrice = [];
           const medianLine = [];
 
-          latestDates.forEach((date) => {
+          latestDates.forEach((date, index) => {
             const items = groupedData[date];
             const prices = items.map(i => i.contracted_price);
             const maxPrice = Math.max(...prices);
             const minPrice = Math.min(...prices);
             const medianPrice = (maxPrice + minPrice) / 2;
 
-            medianLine.push({ x: date, y: medianPrice });
             candlestickData.push({ x: date, y: [minPrice, maxPrice] });
+            medianLine.push({ x: date, y: medianPrice });
 
-            // ✅ 最新日付の中で一番新しい current_price を取得
-            const latestItem = items.reduce((latest, item) => {
-              return new Date(item.date) > new Date(latest.date) ? item : latest;
-            });
-            latestPrice.push({ x: date, y: latestItem.current_price });
+            if (index === latestDates.length - 1) {
+              const latestItem = items.reduce((latest, item) => {
+                return new Date(item.date) > new Date(latest.date) ? item : latest;
+              }, items[0]);
+              latestPrice.push({ x: date, y: latestItem.current_price });
+            }
           });
 
           const ctx = document.getElementById("stockChart").getContext("2d");
@@ -95,10 +96,7 @@
               datasets: [
                 {
                   label: "株価範囲（最小値-最大値）",
-                  data: candlestickData.map(item => ({
-                    x: item.x,
-                    y: item.y,
-                  })),
+                  data: candlestickData.map(item => ({ x: item.x, y: item.y })),
                   backgroundColor: "rgba(75, 192, 192, 0.5)",
                   borderColor: "rgba(75, 192, 192, 1)",
                   borderWidth: 1,
@@ -115,7 +113,7 @@
                 {
                   label: "中央値",
                   type: "line",
-                  data: medianLine.map(item => ({ x: item.x, y: item.y })),
+                  data: medianLine,
                   borderColor: "rgba(54, 162, 235, 1)",
                   borderWidth: 2,
                   fill: false,
