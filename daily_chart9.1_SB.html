@@ -83,7 +83,8 @@
               const latestItem = items.reduce((latest, item) => {
                 return new Date(item.date) > new Date(latest.date) ? item : latest;
               }, items[0]);
-              latestPrice.push({ x: date, y: latestItem.current_price });
+              
+              latestPrice.push({ x: toJST(latestItem.date), y: latestItem.current_price });
             }
           });
 
