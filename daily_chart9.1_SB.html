@@ -3,38 +3,61 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>株価チャート</title>
+  <title>株価チャート（期間別）</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      height: 100vh;
       margin: 0;
+      padding: 0;
     }
-    #chart-container {
-      width: 100%;
-      max-width: 1000px;
-      height: 90vh;
+    .tab {
+      display: flex;
+      justify-content: center;
+      background-color: #f1f1f1;
+      padding: 10px;
+    }
+    .tab button {
+      background-color: inherit;
+      border: none;
+      padding: 14px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .tab button.active {
+      background-color: #ccc;
+    }
+    .chart-container {
+      display: none;
+      padding: 20px;
+      height: 80vh;
     }
     canvas {
-      width: 100%;
-      height: 100%;
+      width: 100% !important;
+      height: 100% !important;
     }
   </style>
 </head>
 <body>
-  <div id="chart-container">
-    <canvas id="stockChart"></canvas>
+  <div class="tab">
+    <button class="tablink" onclick="showChart('hourly')">1時間足</button>
+    <button class="tablink" onclick="showChart('daily')">日足</button>
+    <button class="tablink" onclick="showChart('weekly')">週足</button>
   </div>
+
+  <div id="hourly" class="chart-container"><canvas id="chartHourly"></canvas></div>
+  <div id="daily" class="chart-container"><canvas id="chartDaily"></canvas></div>
+  <div id="weekly" class="chart-container"><canvas id="chartWeekly"></canvas></div>
+
   <script>
-    const toJST = (utcDateStr) => {
-      const date = new Date(utcDateStr);
-      return date.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    const showChart = (period) => {
+      document.querySelectorAll('.chart-container').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.tab button').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(period).style.display = 'block';
+      document.querySelector(`.tab button[onclick="showChart('${period}')"]`).classList.add('active');
     };
+
+    showChart('daily');
 
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
@@ -48,146 +71,86 @@
     const apiUrl = `https://ddtszhkycoqnffgciucl.supabase.co/functions/v1/GetSheetDataForDailyChart_v1?company_name=${encodeURIComponent(company_name)}`;
 
     fetch(apiUrl)
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.status === "success") {
-          const stockData = data.data;
+      .then(response => response.json())
+      .then(data => {
+        if (data.status !== "success") {
+          document.body.innerHTML = `<p>Error: ${data.message}</p>`;
+          return;
+        }
 
-          const groupedData = stockData.reduce((acc, item) => {
-            const jstDate = toJST(item.date);
-            if (!acc[jstDate]) {
-              acc[jstDate] = [];
-            }
-            acc[jstDate].push(item);
+        const stockData = data.data;
+
+        // データを区切りごとに分類
+        const groupBy = (array, keyFn) => {
+          return array.reduce((acc, item) => {
+            const key = keyFn(item);
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(item);
             return acc;
           }, {});
+        };
 
-          const sortedDates = Object.keys(groupedData).sort((a, b) => new Date(a) - new Date(b));
-          const latestDates = sortedDates.slice(-7);
+        const formatDate = (str) => new Date(str).toLocaleDateString("ja-JP", { timeZone: 'Asia/Tokyo' });
+        const formatHour = (str) => new Date(str).getHours() + ':00';
+        const formatWeek = (str) => {
+          const date = new Date(str);
+          const week = Math.ceil(date.getDate() / 7);
+          return `${date.getMonth() + 1}月${week}週`;
+        };
 
-          const candlestickData = [];
-          const latestPrice = [];
-          const medianLine = [];
-
-          latestDates.forEach((date, index) => {
-            const items = groupedData[date];
+        const createChartData = (groupedData) => {
+          return Object.entries(groupedData).map(([key, items]) => {
             const prices = items.map(i => i.contracted_price);
-            const maxPrice = Math.max(...prices);
-            const minPrice = Math.min(...prices);
-            const medianPrice = (maxPrice + minPrice) / 2;
-
-            candlestickData.push({ x: date, y: [minPrice, maxPrice] });
-            medianLine.push({ x: date, y: medianPrice });
-
-            if (index === latestDates.length - 1) {
-              const latestItem = items.reduce((latest, item) => {
-                return new Date(item.date) > new Date(latest.date) ? item : latest;
-              }, items[0]);
-              
-              latestPrice.push({ x: toJST(latestItem.date), y: latestItem.current_price });
-            }
+            const avg = prices.reduce((a,b) => a+b, 0) / prices.length;
+            const std = Math.sqrt(prices.reduce((sum, p) => sum + Math.pow(p - avg, 2), 0) / prices.length);
+            return {
+              x: key,
+              y: avg,
+              std
+            };
           });
+        };
 
-          const ctx = document.getElementById("stockChart").getContext("2d");
-
+        const renderChart = (id, chartData, label) => {
+          const ctx = document.getElementById(id).getContext("2d");
           new Chart(ctx, {
-            type: "bar",
+            type: 'line',
             data: {
-              labels: latestDates,
+              labels: chartData.map(d => d.x),
               datasets: [
                 {
-                  label: "株価範囲（最小値-最大値）",
-                  data: candlestickData.map(item => ({ x: item.x, y: item.y })),
-                  backgroundColor: "rgba(75, 192, 192, 0.5)",
-                  borderColor: "rgba(75, 192, 192, 1)",
-                  borderWidth: 1,
-                  barPercentage: 0.6,
-                },
-                {
-                  label: "最新値",
-                  type: "scatter",
-                  data: latestPrice,
-                  backgroundColor: "rgba(255, 99, 132, 1)",
-                  pointStyle: "circle",
-                  radius: 6,
-                },
-                {
-                  label: "中央値",
-                  type: "line",
-                  data: medianLine,
-                  borderColor: "rgba(54, 162, 235, 1)",
-                  borderWidth: 2,
+                  label: label,
+                  data: chartData.map(d => d.y),
+                  borderColor: 'blue',
                   fill: false,
-                  tension: 0.1,
+                },
+                {
+                  label: '標準偏差',
+                  data: chartData.map(d => d.std),
+                  borderColor: 'orange',
+                  fill: false,
+                  borderDash: [5, 5],
                 }
-              ],
+              ]
             },
             options: {
               responsive: true,
-              plugins: {
-                tooltip: {
-                  callbacks: {
-                    label: function (tooltipItem) {
-                      const label = tooltipItem.dataset.label;
-                      const dataPoint = candlestickData.find(item => item.x === tooltipItem.label);
-                      if (label === "最新値") {
-                        return `最新値: ${tooltipItem.raw.y}`;
-                      } else if (label === "株価範囲（最小値-最大値）") {
-                        return `最小値: ${dataPoint.y[0]}, 最大値: ${dataPoint.y[1]}`;
-                      } else if (label === "中央値") {
-                        return `中央値: ${tooltipItem.raw.y}`;
-                      }
-                      return null;
-                    },
-                  },
-                },
-                legend: {
-                  labels: {
-                    usePointStyle: true,
-                    generateLabels: function (chart) {
-                      return chart.data.datasets.map((dataset) => ({
-                        text: dataset.label,
-                        fillStyle:
-                          dataset.label === "最新値"
-                            ? "rgba(255, 99, 132, 1)"
-                            : dataset.label === "中央値"
-                            ? "rgba(54, 162, 235, 1)"
-                            : "rgba(75, 192, 192, 0.5)",
-                        strokeStyle: dataset.borderColor,
-                        pointStyle:
-                          dataset.label === "最新値"
-                            ? "circle"
-                            : dataset.label === "中央値"
-                            ? "line"
-                            : "rect",
-                      }));
-                    },
-                  },
-                },
-              },
+              plugins: { legend: { position: 'top' } },
               scales: {
-                x: {
-                  type: "category",
-                  title: {
-                    display: true,
-                    text: "日付",
-                  },
-                },
-                y: {
-                  title: {
-                    display: true,
-                    text: "株価",
-                  },
-                  beginAtZero: false,
-                },
-              },
-            },
+                x: { title: { display: true, text: '時間/日付' } },
+                y: { title: { display: true, text: '株価' } }
+              }
+            }
           });
-        } else {
-          document.body.innerHTML = `<p>Error: ${data.message}</p>`;
-        }
+        };
+
+        // チャート描画
+        renderChart('chartHourly', createChartData(groupBy(stockData, d => formatHour(d.date))), '1時間足');
+        renderChart('chartDaily', createChartData(groupBy(stockData, d => formatDate(d.date))), '日足');
+        renderChart('chartWeekly', createChartData(groupBy(stockData, d => formatWeek(d.date))), '週足');
+
       })
-      .catch((error) => {
+      .catch(error => {
         console.error("Error fetching data:", error);
         document.body.innerHTML = `<p>Error fetching data: ${error.message}</p>`;
       });
