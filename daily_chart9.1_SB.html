@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -77,12 +76,12 @@
         };
 
         const fillMissingHours = (groupedData) => {
-          const keys = Object.keys(groupedData).sort();
           const filled = {};
+          const allKeys = Object.keys(groupedData).sort();
           let lastValid = null;
-          keys.forEach(k => {
-            lastValid = groupedData[k];
-            filled[k] = groupedData[k];
+          allKeys.forEach(k => {
+            if (groupedData[k]) lastValid = groupedData[k];
+            filled[k] = lastValid;
           });
           return filled;
         };
@@ -90,19 +89,15 @@
         const createChartData = (groupedData, onlyLastCurrent = false) => {
           const keys = Object.keys(groupedData).sort();
           return keys.map((label, i) => {
-            const items = groupedData[label];
-            const prices = items.map(i => i.contracted_price);
-            const current = onlyLastCurrent && i !== keys.length - 1 ? null : (items[items.length - 1].current_price || null);
+            const items = groupedData[label] || [];
+            const prices = items.map(i => i.contracted_price).filter(p => p !== undefined);
+            if (prices.length === 0) return null;
             const min = Math.min(...prices);
             const max = Math.max(...prices);
-            return {
-              label,
-              median: (min + max) / 2,
-              min,
-              max,
-              current
-            };
-          });
+            const median = (min + max) / 2;
+            const current = onlyLastCurrent && i !== keys.length - 1 ? null : (items[items.length - 1]?.current_price || null);
+            return { label, min, max, median, current };
+          }).filter(Boolean);
         };
 
         const drawChart = (canvasId, data) => {
@@ -114,11 +109,13 @@
               datasets: [
                 {
                   label: '株価範囲（最小値-最大値）',
-                  data: data.map(d => d.max - d.min),
+                  type: 'bar',
+                  data: data.map(d => ({ x: d.label, y: d.max })),
                   backgroundColor: 'rgba(75,192,192,0.4)',
                   borderColor: 'rgba(75,192,192,1)',
+                  borderWidth: 1,
+                  barPercentage: 0.6,
                   base: data.map(d => d.min),
-                  barPercentage: 0.6
                 },
                 {
                   label: '中央値',
