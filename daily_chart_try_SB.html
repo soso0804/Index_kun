@@ -71,14 +71,16 @@
 
           latestDates.forEach((date, index) => {
             const items = groupedData[date];
-            const prices = items.map(i => i.contracted_price);
+            const prices = items.map(i => i.contracted_price).filter(p => typeof p === 'number');
+            if (prices.length === 0) return;
+
             const maxPrice = Math.max(...prices);
             const minPrice = Math.min(...prices);
             const medianPrice = (maxPrice + minPrice) / 2;
 
             medianLine.push({ x: date, y: medianPrice });
 
-            candlestickData.push({ x: date, y: [minPrice, maxPrice] });
+            candlestickData.push({ x: date, yMax: maxPrice, yMin: minPrice });
 
             if (index === latestDates.length - 1) {
               const currentPrice = items[items.length - 1]?.current_price ?? null;
@@ -99,8 +101,8 @@
                   label: "株価範囲（最小値-最大値）",
                   data: candlestickData.map(item => ({
                     x: item.x,
-                    y: item.y[1],
-                    base: item.y[0],
+                    y: item.yMax,
+                    base: item.yMin
                   })),
                   backgroundColor: "rgba(75, 192, 192, 0.5)",
                   borderColor: "rgba(75, 192, 192, 1)",
@@ -118,7 +120,7 @@
                 {
                   label: "中央値",
                   type: "line",
-                  data: medianLine.map(item => ({ x: item.x, y: item.y })),
+                  data: medianLine,
                   borderColor: "rgba(54, 162, 235, 1)",
                   backgroundColor: "rgba(54, 162, 235, 1)",
                   borderWidth: 2,
@@ -141,7 +143,7 @@
                       if (label === "最新値") {
                         return `最新値: ${tooltipItem.raw.y}`;
                       } else if (label === "株価範囲（最小値-最大値）") {
-                        return `最小値: ${dataPoint.y[0]}, 最大値: ${dataPoint.y[1]}`;
+                        return `最小値: ${dataPoint.yMin}, 最大値: ${dataPoint.yMax}`;
                       } else if (label === "中央値") {
                         return `中央値: ${tooltipItem.raw.y}`;
                       }
