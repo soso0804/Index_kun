@@ -129,12 +129,13 @@
                   pointRadius: 4,
                   pointStyle: 'circle',
                   fill: false,
-                  tension: 0.3
+                  tension: 0.3,
+                  showLine: true
                 },
                 {
                   label: '最新値',
                   type: 'scatter',
-                  data: data.map(d => d.current !== null ? { x: d.label, y: d.current } : null).filter(Boolean),
+                  data: data.map((d, i) => (i === data.length - 1 && d.current !== null) ? { x: d.label, y: d.current } : null).filter(Boolean),
                   backgroundColor: 'rgba(255,99,132,1)',
                   pointRadius: 5
                 }
