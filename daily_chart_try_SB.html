@@ -90,22 +90,27 @@
           const keys = Object.keys(groupedData).sort();
           return keys.map((label, i) => {
             const items = groupedData[label];
-            const prices = items.map(i => i.contracted_price);
-            const current = onlyLastCurrent && i !== keys.length - 1 ? null : (items[items.length - 1].current_price || null);
+            const prices = items.map(i => i.contracted_price).filter(p => p !== undefined);
+            if (prices.length === 0) return null;
             const min = Math.min(...prices);
             const max = Math.max(...prices);
+            const median = (min + max) / 2;
+            const current = onlyLastCurrent && i !== keys.length - 1 ? null : (items[items.length - 1]?.current_price || null);
             return {
               label,
-              median: (min + max) / 2,
               min,
               max,
+              median,
               current
             };
-          });
+          }).filter(Boolean);
         };
 
         const drawChart = (canvasId, data) => {
           const ctx = document.getElementById(canvasId).getContext("2d");
+          const yMin = Math.min(...data.map(d => d.min));
+          const yMax = Math.max(...data.map(d => d.max));
+
           new Chart(ctx, {
             type: 'bar',
             data: {
@@ -113,10 +118,10 @@
               datasets: [
                 {
                   label: '株価範囲（最小値-最大値）',
-                  data: data.map(d => ({ x: d.label, y: d.max - d.min })),
+                  type: 'bar',
+                  data: data.map(d => ({ x: d.label, y: d.max })),
                   backgroundColor: 'rgba(75,192,192,0.4)',
                   borderColor: 'rgba(75,192,192,1)',
-                  parsing: { yAxisKey: 'y' },
                   base: data.map(d => d.min),
                   barPercentage: 0.6
                 },
@@ -158,7 +163,15 @@
               },
               scales: {
                 x: { title: { display: true, text: '日付' } },
-                y: { title: { display: true, text: '株価' }, beginAtZero: false }
+                y: {
+                  title: { display: true, text: '株価' },
+                  beginAtZero: false,
+                  min: yMin,
+                  max: yMax,
+                  ticks: {
+                    callback: (value) => `${value.toLocaleString()}`
+                  }
+                }
               }
             }
           });
