@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -6,36 +7,12 @@
   <title>株価チャート（期間別）</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-    }
-    .tab {
-      display: flex;
-      justify-content: center;
-      background-color: #f1f1f1;
-      padding: 10px;
-    }
-    .tab button {
-      background-color: inherit;
-      border: none;
-      padding: 14px 20px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    .tab button.active {
-      background-color: #ccc;
-    }
-    .chart-container {
-      display: none;
-      padding: 20px;
-      height: 80vh;
-    }
-    canvas {
-      width: 100% !important;
-      height: 100% !important;
-    }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    .tab { display: flex; justify-content: center; background-color: #f1f1f1; padding: 10px; }
+    .tab button { background-color: inherit; border: none; padding: 14px 20px; font-size: 16px; cursor: pointer; }
+    .tab button.active { background-color: #ccc; }
+    .chart-container { display: none; padding: 20px; height: 80vh; }
+    canvas { width: 100% !important; height: 100% !important; }
   </style>
 </head>
 <body>
@@ -44,7 +21,6 @@
     <button class="tablink" onclick="showChart('daily')">日足</button>
     <button class="tablink" onclick="showChart('weekly')">週足</button>
   </div>
-
   <div id="hourly" class="chart-container"><canvas id="chartHourly"></canvas></div>
   <div id="daily" class="chart-container"><canvas id="chartDaily"></canvas></div>
   <div id="weekly" class="chart-container"><canvas id="chartWeekly"></canvas></div>
@@ -56,13 +32,11 @@
       document.getElementById(period).style.display = 'block';
       document.querySelector(`.tab button[onclick="showChart('${period}')"]`).classList.add('active');
     };
-
     showChart('daily');
 
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     const company_name = urlParams.get("company_name");
-
     if (!company_name) {
       document.body.innerHTML = "<p>Error: company_name parameter is missing in the URL.</p>";
       throw new Error("Missing company_name parameter.");
@@ -80,17 +54,21 @@
 
         const stockData = data.data;
 
-        const groupBy = (array, keyFn) => array.reduce((acc, item) => {
-          const key = keyFn(item);
-          if (!acc[key]) acc[key] = [];
-          acc[key].push(item);
+        const groupBy = (array, keyFn) => {
+          const acc = {};
+          array.forEach(item => {
+            const key = keyFn(item);
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(item);
+          });
           return acc;
-        }, {});
+        };
 
         const formatDate = (str) => new Date(str).toLocaleDateString("ja-JP", { timeZone: 'Asia/Tokyo' });
         const formatHour = (str) => {
           const d = new Date(str);
-          return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:00`;
+          d.setMinutes(0, 0, 0);
+          return d.toLocaleString("ja-JP", { hour: '2-digit', day: 'numeric', month: 'numeric' });
         };
         const formatWeek = (str) => {
           const date = new Date(str);
@@ -98,10 +76,23 @@
           return `${date.getMonth() + 1}月${week}週`;
         };
 
-        const createChartData = (groupedData) => {
-          return Object.entries(groupedData).map(([label, items]) => {
+        const fillMissingHours = (groupedData) => {
+          const keys = Object.keys(groupedData).sort();
+          const filled = {};
+          let lastValid = null;
+          keys.forEach(k => {
+            lastValid = groupedData[k];
+            filled[k] = groupedData[k];
+          });
+          return filled;
+        };
+
+        const createChartData = (groupedData, onlyLastCurrent = false) => {
+          const keys = Object.keys(groupedData).sort();
+          return keys.map((label, i) => {
+            const items = groupedData[label];
             const prices = items.map(i => i.contracted_price);
-            const current = items[items.length - 1].current_price;
+            const current = onlyLastCurrent && i !== keys.length - 1 ? null : (items[items.length - 1].current_price || null);
             const min = Math.min(...prices);
             const max = Math.max(...prices);
             return {
@@ -117,29 +108,30 @@
         const drawChart = (canvasId, data) => {
           const ctx = document.getElementById(canvasId).getContext("2d");
           new Chart(ctx, {
-            type: 'line',
+            type: 'bar',
             data: {
               labels: data.map(d => d.label),
               datasets: [
                 {
+                  label: '株価範囲（最小値-最大値）',
+                  data: data.map(d => d.max - d.min),
+                  backgroundColor: 'rgba(75,192,192,0.4)',
+                  borderColor: 'rgba(75,192,192,1)',
+                  base: data.map(d => d.min),
+                  barPercentage: 0.6
+                },
+                {
                   label: '中央値',
+                  type: 'line',
                   data: data.map(d => d.median),
                   borderColor: 'rgba(54,162,235,1)',
                   fill: false,
-                  tension: 0.3,
-                },
-                {
-                  label: '株価範囲（最小値-最大値）',
-                  data: data.map(d => ({ y: d.median, yMin: d.min, yMax: d.max })),
-                  type: 'bar',
-                  backgroundColor: 'rgba(75,192,192,0.4)',
-                  borderColor: 'rgba(75,192,192,1)',
-                  borderWidth: 1
+                  tension: 0.3
                 },
                 {
                   label: '最新値',
                   type: 'scatter',
-                  data: data.map(d => d.current ? { x: d.label, y: d.current } : null).filter(Boolean),
+                  data: data.map(d => d.current !== null ? { x: d.label, y: d.current } : null).filter(Boolean),
                   backgroundColor: 'rgba(255,99,132,1)',
                   pointRadius: 5
                 }
@@ -147,15 +139,6 @@
             },
             options: {
               responsive: true,
-              scales: {
-                x: {
-                  title: { display: true, text: '時間・日付' }
-                },
-                y: {
-                  title: { display: true, text: '株価' },
-                  beginAtZero: false
-                }
-              },
               plugins: {
                 legend: { position: 'top' },
                 tooltip: {
@@ -168,14 +151,18 @@
                     }
                   }
                 }
+              },
+              scales: {
+                x: { title: { display: true, text: '時間・日付' } },
+                y: { title: { display: true, text: '株価' }, beginAtZero: false }
               }
             }
           });
         };
 
-        drawChart('chartHourly', createChartData(groupBy(stockData, d => formatHour(d.date))));
-        drawChart('chartDaily', createChartData(groupBy(stockData, d => formatDate(d.date))));
-        drawChart('chartWeekly', createChartData(groupBy(stockData, d => formatWeek(d.date))));
+        drawChart('chartHourly', createChartData(fillMissingHours(groupBy(stockData, d => formatHour(d.date))), true));
+        drawChart('chartDaily', createChartData(groupBy(stockData, d => formatDate(d.date)), true));
+        drawChart('chartWeekly', createChartData(groupBy(stockData, d => formatWeek(d.date)), true));
 
       })
       .catch(error => {
