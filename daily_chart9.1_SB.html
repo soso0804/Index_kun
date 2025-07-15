@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>株価チャート（期間別）</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -98,91 +98,84 @@
           return `${date.getMonth() + 1}月${week}週`;
         };
 
-        const createRangeChartData = (groupedData) => {
-          return Object.entries(groupedData).map(([key, items]) => {
+        const createChartData = (groupedData) => {
+          return Object.entries(groupedData).map(([label, items]) => {
             const prices = items.map(i => i.contracted_price);
-            const currentPrices = items.map(i => i.current_price).filter(Boolean);
+            const current = items[items.length - 1].current_price;
             const min = Math.min(...prices);
             const max = Math.max(...prices);
-            const median = (min + max) / 2;
-            const latest = currentPrices[currentPrices.length - 1] || null;
             return {
-              x: key,
+              label,
+              median: (min + max) / 2,
               min,
               max,
-              median,
-              latest
+              current
             };
           });
         };
 
-        const renderRangeChart = (id, chartData) => {
-          const ctx = document.getElementById(id).getContext("2d");
+        const drawChart = (canvasId, data) => {
+          const ctx = document.getElementById(canvasId).getContext("2d");
           new Chart(ctx, {
-            type: 'bar',
+            type: 'line',
             data: {
-              labels: chartData.map(d => d.x),
+              labels: data.map(d => d.label),
               datasets: [
                 {
-                  label: "株価範囲（最小値-最大値）",
-                  data: chartData.map(d => ({ x: d.x, y: d.max - d.min })),
-                  backgroundColor: 'rgba(75,192,192,0.4)',
-                  base: chartData.map(d => d.min),
-                  borderSkipped: false,
-                  borderColor: 'rgba(75,192,192,1)',
-                  barPercentage: 0.6
-                },
-                {
-                  label: "中央値",
-                  type: 'line',
-                  data: chartData.map(d => d.median),
+                  label: '中央値',
+                  data: data.map(d => d.median),
                   borderColor: 'rgba(54,162,235,1)',
                   fill: false,
                   tension: 0.3,
-                  pointRadius: 4
                 },
                 {
-                  label: "最新値",
+                  label: '株価範囲（最小値-最大値）',
+                  data: data.map(d => ({ y: d.median, yMin: d.min, yMax: d.max })),
+                  type: 'bar',
+                  backgroundColor: 'rgba(75,192,192,0.4)',
+                  borderColor: 'rgba(75,192,192,1)',
+                  borderWidth: 1
+                },
+                {
+                  label: '最新値',
                   type: 'scatter',
-                  data: chartData.map(d => ({ x: d.x, y: d.latest })).filter(d => d.y !== null),
+                  data: data.map(d => d.current ? { x: d.label, y: d.current } : null).filter(Boolean),
                   backgroundColor: 'rgba(255,99,132,1)',
-                  pointRadius: 6,
+                  pointRadius: 5
                 }
               ]
             },
             options: {
               responsive: true,
+              scales: {
+                x: {
+                  title: { display: true, text: '時間・日付' }
+                },
+                y: {
+                  title: { display: true, text: '株価' },
+                  beginAtZero: false
+                }
+              },
               plugins: {
                 legend: { position: 'top' },
                 tooltip: {
                   callbacks: {
-                    label: (context) => {
-                      const d = chartData[context.dataIndex];
+                    label: function (context) {
+                      const d = data[context.dataIndex];
                       if (context.dataset.label === '中央値') return `中央値: ${d.median}`;
-                      if (context.dataset.label === '最新値') return `最新値: ${d.latest}`;
-                      return `最小: ${d.min}, 最大: ${d.max}`;
+                      if (context.dataset.label === '株価範囲（最小値-最大値）') return `最小: ${d.min}, 最大: ${d.max}`;
+                      if (context.dataset.label === '最新値') return `最新値: ${d.current}`;
                     }
                   }
-                }
-              },
-              scales: {
-                x: {
-                  title: { display: true, text: '日付/時間' },
-                },
-                y: {
-                  title: { display: true, text: '株価' },
-                  beginAtZero: false,
-                  suggestedMin: Math.min(...chartData.map(d => d.min)) - 50,
-                  suggestedMax: Math.max(...chartData.map(d => d.max)) + 50
                 }
               }
             }
           });
         };
 
-        renderRangeChart('chartHourly', createRangeChartData(groupBy(stockData, d => formatHour(d.date))));
-        renderRangeChart('chartDaily', createRangeChartData(groupBy(stockData, d => formatDate(d.date))));
-        renderRangeChart('chartWeekly', createRangeChartData(groupBy(stockData, d => formatWeek(d.date))));
+        drawChart('chartHourly', createChartData(groupBy(stockData, d => formatHour(d.date))));
+        drawChart('chartDaily', createChartData(groupBy(stockData, d => formatDate(d.date))));
+        drawChart('chartWeekly', createChartData(groupBy(stockData, d => formatWeek(d.date))));
 
       })
       .catch(error => {
