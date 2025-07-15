@@ -75,17 +75,6 @@
           return `${date.getMonth() + 1}月${week}週`;
         };
 
-        const fillMissingHours = (groupedData) => {
-          const keys = Object.keys(groupedData).sort();
-          const filled = {};
-          let lastValid = null;
-          keys.forEach(k => {
-            lastValid = groupedData[k];
-            filled[k] = groupedData[k];
-          });
-          return filled;
-        };
-
         const createChartData = (groupedData, onlyLastCurrent = false) => {
           const keys = Object.keys(groupedData).sort();
           return keys.map((label, i) => {
@@ -140,7 +129,7 @@
                 {
                   label: '最新値',
                   type: 'scatter',
-                  data: data.map((d, i) => (i === data.length - 1 && d.current !== null) ? { x: d.label, y: d.current } : null).filter(Boolean),
+                  data: data.map((d, i) => d.current !== null ? { x: d.label, y: d.current } : null).filter(Boolean),
                   backgroundColor: 'rgba(255,99,132,1)',
                   pointRadius: 5
                 }
@@ -177,7 +166,7 @@
           });
         };
 
-        drawChart('chartHourly', createChartData(fillMissingHours(groupBy(stockData, d => formatHour(d.date))), true));
+        drawChart('chartHourly', createChartData(groupBy(stockData, d => formatHour(d.date)), true));
         drawChart('chartDaily', createChartData(groupBy(stockData, d => formatDate(d.date)), true));
         drawChart('chartWeekly', createChartData(groupBy(stockData, d => formatWeek(d.date)), true));
 
