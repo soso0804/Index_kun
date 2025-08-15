@@ -34,7 +34,12 @@
     const qs = new URLSearchParams(location.search);
     const company_name = qs.get("company_name");
     const limit = Number(qs.get("limit")) > 0 ? Number(qs.get("limit")) : 60;
+
+    // ✏️ Edge Function のURL
     const API_BASE = "https://ddtszhkycoqnffgciucl.supabase.co/functions/v1/get_ohlcv_v2";
+
+    // ✏️ 401対策：anon key を付けて呼ぶ（Project Settings → API の anon を貼る）
+    const SUPABASE_ANON = "＜ここに anon key を貼る＞";
 
     const elMsg = document.getElementById("msg");
     const ctx = document.getElementById("stockChart").getContext("2d");
@@ -45,8 +50,11 @@
       throw new Error("Missing company_name");
     }
 
+    // ✏️ 初期tfはURL ?tf=1h/1d/1w があればそれを優先
+    let currentTf = ["1h","1d","1w"].includes(qs.get("tf")) ? qs.get("tf") : "1d";
+    buttons.forEach(b => b.classList.toggle("active", b.dataset.tf === currentTf));
+
     let chart;
-    let currentTf = "1d";
 
     function showMessage(text) {
       elMsg.textContent = text;
@@ -65,25 +73,31 @@
       return "day";
     }
 
+    // ✏️ ここを変更：Authorization / apikey を付ける
     async function fetchData(tf) {
       const url = `${API_BASE}?company_name=${encodeURIComponent(company_name)}&tf=${encodeURIComponent(tf)}&limit=${encodeURIComponent(limit)}`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: {
+          apikey: SUPABASE_ANON,
+          Authorization: `Bearer ${SUPABASE_ANON}`,
+        },
+        // （任意）キャッシュ抑止したい場合：
+        // cache: "no-store",
+      });
       if (!res.ok) {
-        const t = await res.text();
-        throw new Error(`HTTP ${res.status}: ${t}`);
+        const body = await res.text().catch(() => "");
+        throw new Error(`Fetch failed. status=${res.status}, url=${url}, body=${body}`);
       }
       return res.json();
     }
 
     function buildDatasets(payload) {
       const { data, latest_current_price } = payload;
-      const labels = data.map(d => new Date(d.ts));
       const candles = data.map(d => ({ x: new Date(d.ts), o: d.o, h: d.h, l: d.l, c: d.c }));
       const volumes = data.map(d => ({ x: new Date(d.ts), y: d.v }));
 
       const ds = [];
 
-      // Candlestick
       ds.push({
         label: `${payload.code ?? ""} ${payload.brand ?? ""}`.trim(),
         data: candles,
@@ -92,7 +106,6 @@
         color: { up: 'red', down: 'green', unchanged: 'dimgray' },
       });
 
-      // Volume bar
       ds.push({
         type: 'bar',
         label: 'volume',
@@ -104,7 +117,6 @@
         pointRadius: 0,
       });
 
-      // Latest point (scatter on last bucket)
       if (latest_current_price != null && data.length > 0 && Number.isFinite(latest_current_price)) {
         const lastX = new Date(data[data.length - 1].ts);
         ds.push({
@@ -119,14 +131,13 @@
         });
       }
 
-      return { labels, datasets: ds };
+      return { datasets: ds };
     }
 
     function renderChart(payload) {
       hideMessage();
-
       const { datasets } = buildDatasets(payload);
-      const volMax = Math.max(1, ...datasets[1].data.map(p => p.y ?? 0)); // avoid zero suggestedMax
+      const volMax = Math.max(1, ...datasets[1].data.map(p => p.y ?? 0));
       const timeUnit = tfToTimeUnit(payload.timeframe || currentTf);
 
       const options = {
@@ -142,7 +153,7 @@
             position: 'right',
             align: 'center',
             labels: {
-              filter: (item) => item.datasetIndex !== 0, // hide candlestick legend only
+              filter: (item) => item.datasetIndex !== 0,
               boxWidth: 10,
               boxHeight: 2,
             },
@@ -167,13 +178,8 @@
           },
         },
         scales: {
-          x: {
-            type: 'time',
-            time: { unit: timeUnit },
-          },
-          yAxisMain: {
-            position: 'left',
-          },
+          x: { type: 'time', time: { unit: timeUnit } },
+          yAxisMain: { position: 'left' },
           yAxisSub: {
             position: 'right',
             suggestedMax: volMax * 5,
@@ -187,11 +193,7 @@
         chart.config.options = options;
         chart.update();
       } else {
-        chart = new Chart(ctx, {
-          type: 'candlestick',
-          data: { datasets },
-          options,
-        });
+        chart = new Chart(ctx, { type: 'candlestick', data: { datasets }, options });
       }
     }
 
@@ -211,7 +213,7 @@
         renderChart(payload);
       } catch (e) {
         console.error(e);
-        showMessage("データ取得に失敗しました。時間をおいて再度お試しください。");
+        showMessage(String(e));
       }
     }
 
