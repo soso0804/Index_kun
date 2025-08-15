@@ -2,205 +2,223 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>株価チャート</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta name="color-scheme" content="light only" />
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      height: 100vh;
-      margin: 0;
-    }
-    #chart-container {
-      width: 100%;
-      max-width: 1000px;
-      height: 90vh;
-    }
-    canvas {
-      width: 100%;
-      height: 100%;
-    }
+    body { font-family: Arial, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; }
+    #controls { width: 100%; max-width: 1000px; display: flex; gap: 8px; padding: 12px 12px 0; box-sizing: border-box; }
+    .tf-btn { padding: 8px 12px; border: 1px solid #ccc; background: #f8f8f8; border-radius: 8px; cursor: pointer; }
+    .tf-btn.active { border-color: #333; background: #e6e6e6; font-weight: bold; }
+    #chart-container { width: 100%; max-width: 1000px; height: 90vh; padding: 0 12px 12px; box-sizing: border-box; }
+    canvas { width: 100%; height: 100%; }
+    #msg { padding: 48px 16px; text-align: center; color: #444; }
   </style>
+  <!-- CDN: Chart.js, Financial plugin, Date adapter -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@3.3.0/dist/chartjs-chart-financial.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.umd.min.js"></script>
 </head>
 <body>
-  <div id="chart-container">
-    <canvas id="stockChart"></canvas>
+  <div id="controls" aria-label="時間足選択">
+    <button class="tf-btn" data-tf="1h">1H</button>
+    <button class="tf-btn active" data-tf="1d">1D</button>
+    <button class="tf-btn" data-tf="1w">1W</button>
   </div>
-  <script>
-    const toJST = (utcDateStr) => {
-      const date = new Date(utcDateStr);
-      return date.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
-    };
+  <div id="chart-container">
+    <canvas id="stockChart" aria-label="株価チャート (ローソク＋出来高)" role="img"></canvas>
+  </div>
+  <div id="msg" hidden></div>
 
-    const queryString = window.location.search;
-    const urlParams = new URLSearchParams(queryString);
-    const company_name = urlParams.get("company_name");
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const company_name = qs.get("company_name");
+    const limit = Number(qs.get("limit")) > 0 ? Number(qs.get("limit")) : 60;
+    const API_BASE = "https://ddtszhkycoqnffgciucl.supabase.co/functions/v1/get_ohlcv_v2";
+
+    const elMsg = document.getElementById("msg");
+    const ctx = document.getElementById("stockChart").getContext("2d");
+    const buttons = Array.from(document.querySelectorAll(".tf-btn"));
 
     if (!company_name) {
-      document.body.innerHTML = "<p>Error: company_name parameter is missing in the URL.</p>";
-      throw new Error("Missing company_name parameter.");
+      showMessage("エラー：URLに company_name パラメータがありません。");
+      throw new Error("Missing company_name");
     }
 
-    const apiUrl = `https://ddtszhkycoqnffgciucl.supabase.co/functions/v1/GetSheetDataForDailyChart_v1?company_name=${encodeURIComponent(company_name)}`;
+    let chart;
+    let currentTf = "1d";
 
-    fetch(apiUrl)
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.status === "success") {
-          const stockData = data.data;
+    function showMessage(text) {
+      elMsg.textContent = text;
+      elMsg.hidden = false;
+      document.getElementById("chart-container").style.display = "none";
+    }
 
-          // 日付ごとに価格をグループ化
-          const groupedData = stockData.reduce((acc, item) => {
-            const jstDate = toJST(item.date);
-            if (!acc[jstDate]) {
-              acc[jstDate] = [];
-            }
-            acc[jstDate].push(item);
-            return acc;
-          }, {});
+    function hideMessage() {
+      elMsg.hidden = true;
+      document.getElementById("chart-container").style.display = "block";
+    }
 
-          const sortedDates = Object.keys(groupedData).sort((a, b) => new Date(a) - new Date(b));
-          const latestDates = sortedDates.slice(-7);
-          const candlestickData = [];
-          const latestPrice = [];
-          const medianLine = [];
+    function tfToTimeUnit(tf) {
+      if (tf === "1h") return "hour";
+      if (tf === "1w") return "week";
+      return "day";
+    }
 
-          latestDates.forEach((date, index) => {
-            const items = groupedData[date];
-            const prices = items.map(i => i.contracted_price).filter(p => typeof p === 'number');
-            if (prices.length === 0) return;
+    async function fetchData(tf) {
+      const url = `${API_BASE}?company_name=${encodeURIComponent(company_name)}&tf=${encodeURIComponent(tf)}&limit=${encodeURIComponent(limit)}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(`HTTP ${res.status}: ${t}`);
+      }
+      return res.json();
+    }
 
-            const maxPrice = Math.max(...prices);
-            const minPrice = Math.min(...prices);
-            const medianPrice = (maxPrice + minPrice) / 2;
+    function buildDatasets(payload) {
+      const { data, latest_current_price } = payload;
+      const labels = data.map(d => new Date(d.ts));
+      const candles = data.map(d => ({ x: new Date(d.ts), o: d.o, h: d.h, l: d.l, c: d.c }));
+      const volumes = data.map(d => ({ x: new Date(d.ts), y: d.v }));
 
-            medianLine.push({ x: date, y: medianPrice });
+      const ds = [];
 
-            candlestickData.push({ x: date, yMax: maxPrice, yMin: minPrice });
-
-            if (index === latestDates.length - 1) {
-              const currentPrice = items[items.length - 1]?.current_price ?? null;
-              if (currentPrice !== null) {
-                latestPrice.push({ x: date, y: currentPrice });
-              }
-            }
-          });
-
-          const ctx = document.getElementById("stockChart").getContext("2d");
-
-          new Chart(ctx, {
-            type: "bar",
-            data: {
-              labels: latestDates,
-              datasets: [
-                {
-                  label: "株価範囲（最小値-最大値）",
-                  data: candlestickData.map(item => ({
-                    x: item.x,
-                    y: item.yMax,
-                    base: item.yMin
-                  })),
-                  backgroundColor: "rgba(75, 192, 192, 0.5)",
-                  borderColor: "rgba(75, 192, 192, 1)",
-                  borderWidth: 1,
-                  barPercentage: 0.6,
-                },
-                {
-                  label: "最新値",
-                  type: "scatter",
-                  data: latestPrice,
-                  backgroundColor: "rgba(255, 99, 132, 1)",
-                  pointStyle: "circle",
-                  radius: 6,
-                },
-                {
-                  label: "中央値",
-                  type: "line",
-                  data: medianLine,
-                  borderColor: "rgba(54, 162, 235, 1)",
-                  backgroundColor: "rgba(54, 162, 235, 1)",
-                  borderWidth: 2,
-                  fill: false,
-                  tension: 0.1,
-                  pointStyle: 'circle',
-                  radius: 4,
-                }
-              ],
-            },
-            options: {
-              responsive: true,
-              plugins: {
-                tooltip: {
-                  callbacks: {
-                    label: function (tooltipItem) {
-                      const label = tooltipItem.dataset.label;
-                      const date = tooltipItem.label;
-                      const dataPoint = candlestickData.find(item => item.x === date);
-                      if (label === "最新値") {
-                        return `最新値: ${tooltipItem.raw.y}`;
-                      } else if (label === "株価範囲（最小値-最大値）") {
-                        return `最小値: ${dataPoint.yMin}, 最大値: ${dataPoint.yMax}`;
-                      } else if (label === "中央値") {
-                        return `中央値: ${tooltipItem.raw.y}`;
-                      }
-                      return null;
-                    },
-                  },
-                },
-                legend: {
-                  labels: {
-                    usePointStyle: true,
-                    generateLabels: function (chart) {
-                      return chart.data.datasets.map((dataset) => ({
-                        text: dataset.label,
-                        fillStyle:
-                          dataset.label === "最新値"
-                            ? "rgba(255, 99, 132, 1)"
-                            : dataset.label === "中央値"
-                            ? "rgba(54, 162, 235, 1)"
-                            : "rgba(75, 192, 192, 0.5)",
-                        strokeStyle: dataset.borderColor,
-                        pointStyle:
-                          dataset.label === "最新値"
-                            ? "circle"
-                            : dataset.label === "中央値"
-                            ? "circle"
-                            : "rect",
-                      }));
-                    },
-                  },
-                },
-              },
-              scales: {
-                x: {
-                  type: "category",
-                  title: {
-                    display: true,
-                    text: "日付",
-                  },
-                },
-                y: {
-                  title: {
-                    display: true,
-                    text: "株価",
-                  },
-                  beginAtZero: false,
-                },
-              },
-            },
-          });
-        } else {
-          document.body.innerHTML = `<p>Error: ${data.message}</p>`;
-        }
-      })
-      .catch((error) => {
-        console.error("Error fetching data:", error);
-        document.body.innerHTML = `<p>Error fetching data: ${error.message}</p>`;
+      // Candlestick
+      ds.push({
+        label: `${payload.code ?? ""} ${payload.brand ?? ""}`.trim(),
+        data: candles,
+        type: 'candlestick',
+        yAxisID: 'yAxisMain',
+        color: { up: 'red', down: 'green', unchanged: 'dimgray' },
       });
+
+      // Volume bar
+      ds.push({
+        type: 'bar',
+        label: 'volume',
+        data: volumes,
+        yAxisID: 'yAxisSub',
+        borderColor: 'lavender',
+        backgroundColor: 'aliceblue',
+        borderWidth: 1,
+        pointRadius: 0,
+      });
+
+      // Latest point (scatter on last bucket)
+      if (latest_current_price != null && data.length > 0 && Number.isFinite(latest_current_price)) {
+        const lastX = new Date(data[data.length - 1].ts);
+        ds.push({
+          type: 'scatter',
+          label: 'latest',
+          data: [{ x: lastX, y: Number(latest_current_price) }],
+          pointRadius: 5,
+          pointHoverRadius: 6,
+          pointBackgroundColor: 'red',
+          showLine: false,
+          yAxisID: 'yAxisMain',
+        });
+      }
+
+      return { labels, datasets: ds };
+    }
+
+    function renderChart(payload) {
+      hideMessage();
+
+      const { datasets } = buildDatasets(payload);
+      const volMax = Math.max(1, ...datasets[1].data.map(p => p.y ?? 0)); // avoid zero suggestedMax
+      const timeUnit = tfToTimeUnit(payload.timeframe || currentTf);
+
+      const options = {
+        responsive: true,
+        maintainAspectRatio: false,
+        parsing: false,
+        plugins: {
+          title: {
+            display: true,
+            text: `${payload.code ?? ""} ${payload.brand ?? ""}`.trim(),
+          },
+          legend: {
+            position: 'right',
+            align: 'center',
+            labels: {
+              filter: (item) => item.datasetIndex !== 0, // hide candlestick legend only
+              boxWidth: 10,
+              boxHeight: 2,
+            },
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            callbacks: {
+              label: (ctx) => {
+                const dsType = ctx.dataset.type;
+                if (dsType === 'candlestick') {
+                  const v = ctx.raw;
+                  return `O:${v.o} H:${v.h} L:${v.l} C:${v.c}`;
+                } else if (dsType === 'bar') {
+                  return `Volume: ${ctx.raw.y}`;
+                } else if (dsType === 'scatter') {
+                  return `Latest: ${ctx.raw.y}`;
+                }
+                return ctx.formattedValue;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: timeUnit },
+          },
+          yAxisMain: {
+            position: 'left',
+          },
+          yAxisSub: {
+            position: 'right',
+            suggestedMax: volMax * 5,
+            grid: { drawOnChartArea: false },
+          },
+        },
+      };
+
+      if (chart) {
+        chart.config.data.datasets = datasets;
+        chart.config.options = options;
+        chart.update();
+      } else {
+        chart = new Chart(ctx, {
+          type: 'candlestick',
+          data: { datasets },
+          options,
+        });
+      }
+    }
+
+    async function load(tf) {
+      currentTf = tf;
+      buttons.forEach(b => b.classList.toggle("active", b.dataset.tf === tf));
+      try {
+        const payload = await fetchData(tf);
+        if (payload.status !== "success") {
+          showMessage(`エラー：${payload.message ?? "不明なエラー"}`);
+          return;
+        }
+        if (!payload.data || payload.data.length === 0) {
+          showMessage("データがありません。");
+          return;
+        }
+        renderChart(payload);
+      } catch (e) {
+        console.error(e);
+        showMessage("データ取得に失敗しました。時間をおいて再度お試しください。");
+      }
+    }
+
+    buttons.forEach(btn => btn.addEventListener("click", () => load(btn.dataset.tf)));
+
+    // initial load
+    load(currentTf);
   </script>
 </body>
 </html>
