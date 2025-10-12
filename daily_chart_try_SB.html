@@ -1,226 +1,142 @@
-<!DOCTYPE html>
-<html lang="ja">
+<!doctype html>
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>株価チャート</title>
-  <meta name="color-scheme" content="light only" />
+  <meta charset="utf-8" />
+  <title>Daily OHLCV Chart</title>
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; }
-    #controls { width: 100%; max-width: 1000px; display: flex; gap: 8px; padding: 12px 12px 0; box-sizing: border-box; }
-    .tf-btn { padding: 8px 12px; border: 1px solid #ccc; background: #f8f8f8; border-radius: 8px; cursor: pointer; }
-    .tf-btn.active { border-color: #333; background: #e6e6e6; font-weight: bold; }
-    #chart-container { width: 100%; max-width: 1000px; height: 90vh; padding: 0 12px 12px; box-sizing: border-box; }
-    canvas { width: 100%; height: 100%; }
-    #msg { padding: 48px 16px; text-align: center; color: #444; }
+    body { margin: 0; font-family: system-ui, sans-serif; background:#fff; }
+    #wrap { display:flex; flex-direction:column; gap:8px; padding:8px; }
+    #title { font-weight:600; padding:4px 2px; }
+    #candle, #volume { width:100%; }
+    #candle { height: 360px; }
+    #volume { height: 140px; }
   </style>
-  <!-- CDN: Chart.js, Financial plugin, Date adapter -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@3.3.0/dist/chartjs-chart-financial.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.umd.min.js"></script>
 </head>
 <body>
-  <div id="controls" aria-label="時間足選択">
-    <button class="tf-btn" data-tf="1h">1H</button>
-    <button class="tf-btn active" data-tf="1d">1D</button>
-    <button class="tf-btn" data-tf="1w">1W</button>
-  </div>
-  <div id="chart-container">
-    <canvas id="stockChart" aria-label="株価チャート (ローソク＋出来高)" role="img"></canvas>
-  </div>
-  <div id="msg" hidden></div>
+<div id="wrap">
+  <div id="title">Loading…</div>
+  <div id="candle"></div>
+  <div id="volume"></div>
+</div>
 
-  <script>
-    const qs = new URLSearchParams(location.search);
-    const company_name = qs.get("company_name");
-    const limit = Number(qs.get("limit")) > 0 ? Number(qs.get("limit")) : 60;
+<script>
+const SUPABASE_URL = "https://<your-project-ref>.supabase.co";   // ←置き換え
+const SUPABASE_ANON_KEY = "<your-anon-key>";                      // ←置き換え
 
-    // ✏️ Edge Function のURL
-    const API_BASE = "https://ddtszhkycoqnffgciucl.supabase.co/functions/v1/get_ohlcv_v2";
+// URLクエリから company / days を取得（例 ?company=KATOJI&days=120）
+const params = new URLSearchParams(location.search);
+const COMPANY = params.get("company") || "KATOJI";
+const DAYS = Number(params.get("days") || 120);
 
-    // ✏️ 401対策：anon key を付けて呼ぶ（Project Settings → API の anon を貼る）
-    const SUPABASE_ANON = "＜ここに anon key を貼る＞";
+// 直近DAYS日（JST日付ベース）
+const since = new Date();
+since.setDate(since.getDate() - DAYS);
+const sinceStr = since.toISOString().slice(0,10); // YYYY-MM-DD
 
-    const elMsg = document.getElementById("msg");
-    const ctx = document.getElementById("stockChart").getContext("2d");
-    const buttons = Array.from(document.querySelectorAll(".tf-btn"));
-
-    if (!company_name) {
-      showMessage("エラー：URLに company_name パラメータがありません。");
-      throw new Error("Missing company_name");
+async function fetchJSON(path) {
+  const r = await fetch(`${SUPABASE_URL}${path}`, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
     }
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
 
-    // ✏️ 初期tfはURL ?tf=1h/1d/1w があればそれを優先
-    let currentTf = ["1h","1d","1w"].includes(qs.get("tf")) ? qs.get("tf") : "1d";
-    buttons.forEach(b => b.classList.toggle("active", b.dataset.tf === currentTf));
+(async function main() {
+  document.getElementById('title').textContent =
+    `${COMPANY} — Daily OHLCV (${DAYS}d)`;
 
-    let chart;
+  // 確定OHLCV（company_daily_ohlcv）を取得
+  // ※当日をリアルタイムで見せたい場合は ohlcv_live に差し替え可
+  const path =
+    `/rest/v1/company_daily_ohlcv`
+    + `?company_name=eq.${encodeURIComponent(COMPANY)}`
+    + `&trade_date=gte.${sinceStr}`
+    + `&select=trade_date,open,high,low,close,volume`
+    + `&order=trade_date.asc`;
+  const rows = await fetchJSON(path);
 
-    function showMessage(text) {
-      elMsg.textContent = text;
-      elMsg.hidden = false;
-      document.getElementById("chart-container").style.display = "none";
+  if (!rows.length) {
+    document.getElementById('title').textContent = `${COMPANY} — No data`;
+    return;
+  }
+
+  // Lightweight Charts フォーマットへ変換
+  // timeは 'YYYY-MM-DD' 文字列でOK
+  const candles = rows.map(r => ({
+    time: r.trade_date,
+    open: Number(r.open),
+    high: Number(r.high),
+    low:  Number(r.low),
+    close:Number(r.close),
+  }));
+
+  const vols = rows.map(r => {
+    const o = Number(r.open), c = Number(r.close);
+    return {
+      time: r.trade_date,
+      value: Number(r.volume || 0),
+      color: c >= o ? '#26a69a' : '#ef5350', // 上昇:緑, 下落:赤
+    };
+  });
+
+  // チャート（上段：ローソク）
+  const candleChart = LightweightCharts.createChart(
+    document.getElementById('candle'),
+    {
+      rightPriceScale: { borderVisible: false },
+      timeScale: { borderVisible: false, timeVisible: false, secondsVisible: false },
+      grid: { horzLines: { color: '#f0f3fa'}, vertLines: { color: '#f0f3fa'} },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+      layout: { background: { color: '#fff' }, textColor: '#333' }
     }
+  );
+  const candleSeries = candleChart.addCandlestickSeries({
+    upColor: '#26a69a', downColor: '#ef5350',
+    wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+    borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+  });
+  candleSeries.setData(candles);
 
-    function hideMessage() {
-      elMsg.hidden = true;
-      document.getElementById("chart-container").style.display = "block";
+  // チャート（下段：出来高）
+  const volChart = LightweightCharts.createChart(
+    document.getElementById('volume'),
+    {
+      rightPriceScale: { borderVisible: false },
+      timeScale: { borderVisible: true, timeVisible: true, secondsVisible: false },
+      grid: { horzLines: { color: '#f0f3fa'}, vertLines: { color: '#f0f3fa'} },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+      layout: { background: { color: '#fff' }, textColor: '#333' }
     }
+  );
+  const volSeries = volChart.addHistogramSeries({ priceFormat: { type: 'volume' } });
+  volSeries.setData(vols);
 
-    function tfToTimeUnit(tf) {
-      if (tf === "1h") return "hour";
-      if (tf === "1w") return "week";
-      return "day";
-    }
-
-    // ✏️ ここを変更：Authorization / apikey を付ける
-    async function fetchData(tf) {
-      const url = `${API_BASE}?company_name=${encodeURIComponent(company_name)}&tf=${encodeURIComponent(tf)}&limit=${encodeURIComponent(limit)}`;
-      const res = await fetch(url, {
-        headers: {
-          apikey: SUPABASE_ANON,
-          Authorization: `Bearer ${SUPABASE_ANON}`,
-        },
-        // （任意）キャッシュ抑止したい場合：
-        // cache: "no-store",
-      });
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        throw new Error(`Fetch failed. status=${res.status}, url=${url}, body=${body}`);
+  // 上下のスクロール・ズームをある程度同期
+  function syncTimescale(master, slave) {
+    master.timeScale().subscribeVisibleTimeRangeChange((range) => {
+      if (!range) return;
+      const r = slave.timeScale().getVisibleRange();
+      if (!r || r.from !== range.from || r.to !== range.to) {
+        slave.timeScale().setVisibleRange(range);
       }
-      return res.json();
-    }
+    });
+  }
+  syncTimescale(candleChart, volChart);
+  syncTimescale(volChart, candleChart);
 
-    function buildDatasets(payload) {
-      const { data, latest_current_price } = payload;
-      const candles = data.map(d => ({ x: new Date(d.ts), o: d.o, h: d.h, l: d.l, c: d.c }));
-      const volumes = data.map(d => ({ x: new Date(d.ts), y: d.v }));
-
-      const ds = [];
-
-      ds.push({
-        label: `${payload.code ?? ""} ${payload.brand ?? ""}`.trim(),
-        data: candles,
-        type: 'candlestick',
-        yAxisID: 'yAxisMain',
-        color: { up: 'red', down: 'green', unchanged: 'dimgray' },
-      });
-
-      ds.push({
-        type: 'bar',
-        label: 'volume',
-        data: volumes,
-        yAxisID: 'yAxisSub',
-        borderColor: 'lavender',
-        backgroundColor: 'aliceblue',
-        borderWidth: 1,
-        pointRadius: 0,
-      });
-
-      if (latest_current_price != null && data.length > 0 && Number.isFinite(latest_current_price)) {
-        const lastX = new Date(data[data.length - 1].ts);
-        ds.push({
-          type: 'scatter',
-          label: 'latest',
-          data: [{ x: lastX, y: Number(latest_current_price) }],
-          pointRadius: 5,
-          pointHoverRadius: 6,
-          pointBackgroundColor: 'red',
-          showLine: false,
-          yAxisID: 'yAxisMain',
-        });
-      }
-
-      return { datasets: ds };
-    }
-
-    function renderChart(payload) {
-      hideMessage();
-      const { datasets } = buildDatasets(payload);
-      const volMax = Math.max(1, ...datasets[1].data.map(p => p.y ?? 0));
-      const timeUnit = tfToTimeUnit(payload.timeframe || currentTf);
-
-      const options = {
-        responsive: true,
-        maintainAspectRatio: false,
-        parsing: false,
-        plugins: {
-          title: {
-            display: true,
-            text: `${payload.code ?? ""} ${payload.brand ?? ""}`.trim(),
-          },
-          legend: {
-            position: 'right',
-            align: 'center',
-            labels: {
-              filter: (item) => item.datasetIndex !== 0,
-              boxWidth: 10,
-              boxHeight: 2,
-            },
-          },
-          tooltip: {
-            mode: 'index',
-            intersect: false,
-            callbacks: {
-              label: (ctx) => {
-                const dsType = ctx.dataset.type;
-                if (dsType === 'candlestick') {
-                  const v = ctx.raw;
-                  return `O:${v.o} H:${v.h} L:${v.l} C:${v.c}`;
-                } else if (dsType === 'bar') {
-                  return `Volume: ${ctx.raw.y}`;
-                } else if (dsType === 'scatter') {
-                  return `Latest: ${ctx.raw.y}`;
-                }
-                return ctx.formattedValue;
-              },
-            },
-          },
-        },
-        scales: {
-          x: { type: 'time', time: { unit: timeUnit } },
-          yAxisMain: { position: 'left' },
-          yAxisSub: {
-            position: 'right',
-            suggestedMax: volMax * 5,
-            grid: { drawOnChartArea: false },
-          },
-        },
-      };
-
-      if (chart) {
-        chart.config.data.datasets = datasets;
-        chart.config.options = options;
-        chart.update();
-      } else {
-        chart = new Chart(ctx, { type: 'candlestick', data: { datasets }, options });
-      }
-    }
-
-    async function load(tf) {
-      currentTf = tf;
-      buttons.forEach(b => b.classList.toggle("active", b.dataset.tf === tf));
-      try {
-        const payload = await fetchData(tf);
-        if (payload.status !== "success") {
-          showMessage(`エラー：${payload.message ?? "不明なエラー"}`);
-          return;
-        }
-        if (!payload.data || payload.data.length === 0) {
-          showMessage("データがありません。");
-          return;
-        }
-        renderChart(payload);
-      } catch (e) {
-        console.error(e);
-        showMessage(String(e));
-      }
-    }
-
-    buttons.forEach(btn => btn.addEventListener("click", () => load(btn.dataset.tf)));
-
-    // initial load
-    load(currentTf);
-  </script>
+  // リサイズ対応
+  const resize = () => {
+    const w = document.getElementById('wrap').clientWidth;
+    candleChart.applyOptions({ width: w });
+    volChart.applyOptions({ width: w });
+  };
+  window.addEventListener('resize', resize);
+  resize();
+})();
+</script>
 </body>
 </html>
