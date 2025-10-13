@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <title>Chart</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Lightweight Charts 固定版 -->
   <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
   <style>
     :root{
@@ -44,6 +43,7 @@
           <button class="btn active" data-days="90">90日</button>
           <button class="btn" data-days="180">180日</button>
           <button class="btn" data-days="365">1年</button>
+          <button class="btn ghost" id="toggle-perc">％</button>
           <button class="btn ghost" id="toggle-theme">🌗 テーマ</button>
         </div>
       </div>
@@ -64,204 +64,216 @@
   </div>
 
 <script>
-/* === Supabase 接続 === */
+/* === Supabase === */
 const SUPABASE_URL = "https://ddtszhkycoqnffgciucl.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdHN6aGt5Y29xbmZmZ2NpdWNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMDExODQsImV4cCI6MjA2NDU3NzE4NH0.hASl_SDEf86hISajh9WQ0o5kVTuWZCV7IJ7y363cN9c";
 
-/* === URLパラメータ === */
-const params  = new URLSearchParams(location.search);
-const COMPANY = params.get("company") || "KATOJI";
-const SRC     = (params.get("src") || "fixed").toLowerCase(); // 'fixed' | 'live'
-const MOCK_Q  = params.get("mock"); // '1' 全モック / '0' モック無効 / 未指定=不足分のみモック
-const DAYS_DEFAULT = Number(params.get("days") || 90);
+/* === URL params === */
+const qp = new URLSearchParams(location.search);
+const COMPANY = qp.get('company') || 'KATOJI';
+const SRC     = (qp.get('src') || 'fixed').toLowerCase();   // fixed|live
+const MOCK    = qp.get('mock');                              // '1' full-mock, '0' no-fill, undefined: fill missing
+const DAYS    = Number(qp.get('days') || 90);
 
-/* === ツール === */
-const sinceFromDays = (days) => { const s = new Date(); s.setDate(s.getDate()-days); return s.toISOString().slice(0,10); };
-async function fetchJSON(path) {
+/* === helpers === */
+const sinceFromDays = (d)=>{ const s=new Date(); s.setDate(s.getDate()-d); return s.toISOString().slice(0,10); };
+async function fetchJSON(path){
   const r = await fetch(`${SUPABASE_URL}${path}`, { headers:{ apikey: SUPABASE_ANON_KEY, Authorization:`Bearer ${SUPABASE_ANON_KEY}` }});
-  if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}: ${await r.text()}`);
-  return r.json();
+  if(!r.ok) throw new Error(await r.text()); return r.json();
 }
-function hashSeed(str){ // 企業名→決定的seed
-  let h = 2166136261;
-  for (let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h += (h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24); }
-  return Math.abs(h % 100000);
+function hashSeed(str){ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h+=(h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);} return Math.abs(h%100000); }
+function prng(seed){ return ()=>{ seed=Math.sin(seed)*10000; return seed-Math.floor(seed); }; }
+function stdev(a){
+  if(a.length<2) return 0.02;
+  const m = a.reduce((x,y)=>x+y,0)/a.length;
+  const v = a.reduce((x,y)=>x+(y-m)**2,0)/(a.length-1);
+  return Math.sqrt(v);
 }
-function makePRNG(seed){ return ()=>{ seed = Math.sin(seed)*10000; return seed - Math.floor(seed);} }
-function makeMockSeries(days, startPx, startVol, seed){
-  const rnd = makePRNG(seed);
-  const base = new Date(); base.setDate(base.getDate() - days);
-  let px = startPx ?? (8000 + Math.round(rnd()*6000));
-  let vol = startVol ?? (20000 + Math.round(rnd()*80000));
+function makeMockLikeSB(days, sbRows, seed){
+  // 終値・出来高の水準とボラティリティ（リターンσ）を推定
+  const closes = sbRows.map(r=>+r.close);
+  const vols   = sbRows.map(r=>+(r.volume||0));
+  const returns = [];
+  for(let i=1;i<closes.length;i++){
+    const r = (closes[i]-closes[i-1])/Math.max(1e-9,closes[i-1]);
+    returns.push(r);
+  }
+  const sigma = Math.max(0.01, Math.min(0.15, stdev(returns)||0.03)); // 1%〜15%にクランプ
+  const startPx  = closes.length? closes[closes.length-1] : 10000;
+  const baseVol  = vols.length?  vols.slice(-Math.min(10,vols.length)).reduce((a,b)=>a+b,0)/Math.min(10,vols.length) : 20000;
+
+  const rnd = prng(seed);
   const out = [];
+  let px = startPx, vol = baseVol;
+  const base = new Date(); base.setDate(base.getDate()-days);
   for(let i=0;i<days;i++){
-    const d = new Date(base); d.setDate(base.getDate()+i+1);
-    const day = d.toISOString().slice(0,10);
-    const drift = (rnd()-.5)*400;
-    const range = 300 + rnd()*1200;
-    const open  = Math.max(100, px + drift);
-    const high  = open + range*rnd();
-    const low   = open - range*(0.3+rnd()*0.7);
-    const close = low + (high-low)*rnd();
+    const d=new Date(base); d.setDate(base.getDate()+i+1);
+    const day=d.toISOString().slice(0,10);
+    // 近似正規：Box–Muller っぽい（簡易）
+    const u = Math.max(1e-6, rnd()), v = Math.max(1e-6, rnd());
+    const z = Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); // ~N(0,1)
+    const ret = z * sigma * 0.6;              // 少し抑えて滑らかに
+    const open = px;
+    const close = Math.max(50, open*(1+ret));
+    const range = Math.abs(ret)*open*3 + (500+1000*rnd()); // ATR相当
+    const high  = Math.max(open, close) + range*rnd()*0.4;
+    const low   = Math.min(open, close)  - range*rnd()*0.4;
+
     px = close;
-    vol = Math.max(5000, vol*(0.7+rnd()*0.8));
-    out.push({ trade_date:day, open:+open.toFixed(2), high:+high.toFixed(2), low:+low.toFixed(2), close:+close.toFixed(2), volume:Math.round(vol) });
+    // 出来高は緩やかにトレンドする
+    vol = Math.max(1000, vol*(0.9+0.2*rnd()));
+
+    out.push({
+      trade_date: day,
+      open:+open.toFixed(2), high:+high.toFixed(2), low:+low.toFixed(2), close:+close.toFixed(2),
+      volume: Math.round(vol)
+    });
   }
   return out;
 }
-function movingAverage(rows, period){
-  const out=[]; let sum=0, q=[];
-  for(const r of rows){ q.push(r.close); sum+=r.close; if(q.length>period){sum-=q.shift()} out.push({time:r.trade_date, value:q.length===period?+(sum/period).toFixed(2):NaN}); }
+function ma(rows,n){
+  const out=[]; let s=0,buf=[];
+  for(const r of rows){ buf.push(+r.close); s+=+r.close; if(buf.length>n) s-=buf.shift(); out.push({time:r.trade_date, value:buf.length===n?+(s/n).toFixed(2):NaN}); }
   return out;
 }
 
-/* === グローバル（チャート再描画用） === */
+/* === globals === */
 let candleChart, volChart, candleSeries, volSeries, ma5Series, ma25Series;
+let priceMode='abs'; // 'abs' | 'pct'
+let currentRows=[], currentDays=DAYS;
 
-/* === 描画 === */
-function drawCharts(rows, days){
-  const wrap = document.getElementById('chart-wrap');
-  // 一旦中身を作り直す（テーマ変更に強い）
-  wrap.innerHTML = `<div id="candle"></div><div id="volume"></div><div class="tooltip hidden" id="tooltip"></div>`;
-  const candleEl = document.getElementById('candle');
-  const volumeEl = document.getElementById('volume');
-  const tip = document.getElementById('tooltip');
+/* === draw === */
+function drawCharts(rows){
+  const wrap=document.getElementById('chart-wrap');
+  wrap.innerHTML=`<div id="candle"></div><div id="volume"></div><div class="tooltip hidden" id="tooltip"></div>`;
+  const candleEl=document.getElementById('candle'), volEl=document.getElementById('volume'), tip=document.getElementById('tooltip');
 
-  const cs = getComputedStyle(document.body);
-  const bg = cs.getPropertyValue('--card').trim();
-  const tx = cs.getPropertyValue('--text').trim();
-  const grid = cs.getPropertyValue('--grid').trim();
+  const cs=getComputedStyle(document.body), bg=cs.getPropertyValue('--card').trim(), tx=cs.getPropertyValue('--text').trim(), grid=cs.getPropertyValue('--grid').trim();
 
-  candleChart = LightweightCharts.createChart(candleEl, {
-    layout:{ background:{ color:bg }, textColor:tx },
-    rightPriceScale:{ borderVisible:false },
+  candleChart=LightweightCharts.createChart(candleEl,{
+    layout:{ background:{color:bg}, textColor:tx },
+    rightPriceScale:{ borderVisible:false, autoScale:true },  // ← 常に自動スケール
     timeScale:{ borderVisible:false, timeVisible:false, secondsVisible:false },
-    grid:{ horzLines:{ color:grid }, vertLines:{ color:grid } },
+    grid:{ horzLines:{color:grid}, vertLines:{color:grid} },
     localization:{ locale:'ja-JP' },
     handleScroll:{ mouseWheel:true, pressedMouseMove:true },
     handleScale:{ axisPressedMouseMove:true, pinch:true },
     autoSize:true,
-    watermark:{ visible:true, text: COMPANY, fontSize: 18, color:'rgba(120,140,160,.25)' }
+    watermark:{ visible:true, text:COMPANY, fontSize:18, color:'rgba(120,140,160,.25)' }
   });
-  candleSeries = candleChart.addCandlestickSeries({
+  candleSeries=candleChart.addCandlestickSeries({
     upColor:'#26a69a', downColor:'#ef5350',
     wickUpColor:'#26a69a', wickDownColor:'#ef5350',
     borderUpColor:'#26a69a', borderDownColor:'#ef5350',
     priceLineVisible:true
   });
 
-  volChart = LightweightCharts.createChart(volumeEl, {
-    layout:{ background:{ color:bg }, textColor:tx },
-    rightPriceScale:{ borderVisible:false },
+  volChart=LightweightCharts.createChart(volEl,{
+    layout:{ background:{color:bg}, textColor:tx },
+    rightPriceScale:{ borderVisible:false, autoScale:true },   // ← 出来高も自動
     timeScale:{ borderVisible:true, timeVisible:true, secondsVisible:false },
-    grid:{ horzLines:{ color:grid }, vertLines:{ color:grid } },
+    grid:{ horzLines:{color:grid}, vertLines:{color:grid} },
     localization:{ locale:'ja-JP' },
     handleScroll:{ mouseWheel:true, pressedMouseMove:true },
     handleScale:{ axisPressedMouseMove:true, pinch:true },
-    autoSize:true,
+    autoSize:true
   });
-  volSeries = volChart.addHistogramSeries({ priceFormat:{ type:'volume' }, color:getComputedStyle(document.documentElement).getPropertyValue('--vol').trim(), baseLineVisible:false });
+  volSeries=volChart.addHistogramSeries({ priceFormat:{type:'volume'}, color:getComputedStyle(document.documentElement).getPropertyValue('--vol').trim(), baseLineVisible:false });
 
-  const candles = rows.map(r=>({time:r.trade_date, open:+r.open, high:+r.high, low:+r.low, close:+r.close}));
-  const vols = rows.map(r=>({time:r.trade_date, value:+(r.volume||0)}));
-  const ma5  = movingAverage(rows, 5);
-  const ma25 = movingAverage(rows, 25);
+  // data
+  const candles=rows.map(r=>({time:r.trade_date, open:+r.open, high:+r.high, low:+r.low, close:+r.close}));
+  const vols=rows.map(r=>({time:r.trade_date, value:+(r.volume||0)}));
+  const ma5=ma(rows,5), ma25=ma(rows,25);
+  candleSeries.setData(candles); volSeries.setData(vols);
+  ma5Series=candleChart.addLineSeries({ color:'#5b9bff', lineWidth:2, priceLineVisible:false }); ma5Series.setData(ma5);
+  ma25Series=candleChart.addLineSeries({ color:'#c084fc', lineWidth:2, priceLineVisible:false }); ma25Series.setData(ma25);
 
-  candleSeries.setData(candles);
-  volSeries.setData(vols);
-  ma5Series  = candleChart.addLineSeries({ color:'#5b9bff', lineWidth:2, priceLineVisible:false }); ma5Series.setData(ma5);
-  ma25Series = candleChart.addLineSeries({ color:'#c084fc', lineWidth:2, priceLineVisible:false }); ma25Series.setData(ma25);
+  // ％モード反映
+  candleChart.priceScale('right').applyOptions({
+    mode: priceMode==='pct' ? LightweightCharts.PriceScaleMode.Percentage
+                            : LightweightCharts.PriceScaleMode.Normal,
+    autoScale:true
+  });
 
-  candleChart.timeScale().fitContent();
-  volChart.timeScale().fitContent();
+  // 横幅いっぱい：論理レンジで強制フィット（本数が少ない時の余白を除去）
+  const N = rows.length;
+  const logicalRange = { from: 0, to: Math.max(1, N-1) };
+  candleChart.timeScale().setVisibleLogicalRange(logicalRange);
+  volChart.timeScale().setVisibleLogicalRange(logicalRange);
 
-  // 同期
-  function sync(master, slave){ master.timeScale().subscribeVisibleTimeRangeChange((range)=>{ if(!range) return; const r=slave.timeScale().getVisibleRange(); if(!r || r.from!==range.from || r.to!==range.to){ slave.timeScale().setVisibleRange(range); } });}
-  sync(candleChart, volChart); sync(volChart, candleChart);
+  // 完全同期（time & logical）
+  let syncing=false;
+  function bind(master, slave){
+    master.timeScale().subscribeVisibleTimeRangeChange(range=>{
+      if(syncing||!range) return; syncing=true; slave.timeScale().setVisibleRange(range); syncing=false;
+    });
+    master.timeScale().subscribeVisibleLogicalRangeChange(range=>{
+      if(syncing||!range) return; syncing=true; slave.timeScale().setVisibleLogicalRange(range); syncing=false;
+    });
+  }
+  bind(candleChart, volChart); bind(volChart, candleChart);
 
-  // ツールチップ
-  candleChart.subscribeCrosshairMove(param=>{
-    if(!param || !param.time || !param.point){ tip.classList.add('hidden'); return; }
-    const c = param.seriesData.get(candleSeries);
-    const m5 = param.seriesData.get(ma5Series);
-    const m25= param.seriesData.get(ma25Series);
-    const v  = param.seriesData.get(volSeries);
+  // tooltip
+  candleChart.subscribeCrosshairMove(p=>{
+    if(!p || !p.time || !p.point){ tip.classList.add('hidden'); return; }
+    const c=p.seriesData.get(candleSeries), m5=p.seriesData.get(ma5Series), m25=p.seriesData.get(ma25Series), v=p.seriesData.get(volSeries);
     if(!c){ tip.classList.add('hidden'); return; }
     tip.classList.remove('hidden');
-    tip.innerHTML = `<b>${param.time}</b><br>O: ${c.open.toLocaleString()} H: ${c.high.toLocaleString()} L: ${c.low.toLocaleString()} C: ${c.close.toLocaleString()}<br>V: ${(v?.value||0).toLocaleString()}　<span style="color:#5b9bff">MA5: ${isFinite(m5?.value)?m5.value.toFixed(2):'-'}</span>　<span style="color:#c084fc">MA25: ${isFinite(m25?.value)?m25.value.toFixed(2):'-'}</span>`;
-    const rect = document.getElementById('chart-wrap').getBoundingClientRect();
-    tip.style.left = `${param.point.x + rect.left}px`; tip.style.top = `${param.point.y + rect.top}px`;
+    tip.innerHTML = `<b>${p.time}</b><br>O: ${c.open.toLocaleString()} H: ${c.high.toLocaleString()} L: ${c.low.toLocaleString()} C: ${c.close.toLocaleString()}<br>V: ${(v?.value||0).toLocaleString()}　<span style="color:#5b9bff">MA5: ${isFinite(m5?.value)?m5.value.toFixed(2):'-'}</span>　<span style="color:#c084fc">MA25: ${isFinite(m25?.value)?m25.value.toFixed(2):'-'}</span>`;
+    const r=document.getElementById('chart-wrap').getBoundingClientRect();
+    tip.style.left=`${p.point.x+r.left}px`; tip.style.top=`${p.point.y+r.top}px`;
   });
 }
 
-/* === メイン === */
-(async function main(){
-  // ヘッダ類
-  document.getElementById('title').textContent = COMPANY; // タイトルは企業名のみ
+/* === main === */
+(async function(){
+  document.getElementById('title').textContent = COMPANY;
 
   // 期間ボタン
   [...document.querySelectorAll('.btn[data-days]')].forEach(b=>{
-    b.classList.toggle('active', Number(b.dataset.days)===DAYS_DEFAULT);
-    b.onclick = ()=>{
-      const days = Number(b.dataset.days);
-      const url = new URL(location.href);
-      url.searchParams.set('days', days);
-      history.replaceState(null, '', url);
-      location.reload();
-    }
+    b.classList.toggle('active', Number(b.dataset.days)===DAYS);
+    b.onclick=()=>{ const d=Number(b.dataset.days); const u=new URL(location.href); u.searchParams.set('days', d); location.href=u.toString(); };
   });
 
-  // テーマ切替：クラスを切替→再描画
-  document.getElementById('toggle-theme').onclick = ()=>{
-    document.body.classList.toggle('light');
-    drawCharts(currentRows, currentDays); // 再描画
-  };
+  // テーマ
+  document.getElementById('toggle-theme').onclick=()=>{ document.body.classList.toggle('light'); drawCharts(currentRows); };
 
-  const currentDays = Number(new URLSearchParams(location.search).get('days') || DAYS_DEFAULT);
-  const sinceStr = sinceFromDays(currentDays);
+  // ％ボタン
+  const percBtn = document.getElementById('toggle-perc');
+  const setPercBtnUI = ()=> percBtn.classList.toggle('active', priceMode==='pct');
+  percBtn.onclick = ()=>{ priceMode = (priceMode==='pct' ? 'abs' : 'pct'); setPercBtnUI(); drawCharts(currentRows); };
+  setPercBtnUI();
 
-  // 1) SBから取得
+  const since = sinceFromDays(DAYS);
   const table = SRC==='live' ? 'company_daily_ohlcv_live' : 'company_daily_ohlcv';
-  let sbRows = [];
+
+  // SBデータ取得
+  let sb=[];
   try{
-    sbRows = await fetchJSON(`/rest/v1/${table}?company_name=eq.${encodeURIComponent(COMPANY)}&trade_date=gte.${sinceStr}&select=trade_date,open,high,low,close,volume&order=trade_date.asc`);
+    sb = await fetchJSON(`/rest/v1/${table}?company_name=eq.${encodeURIComponent(COMPANY)}&trade_date=gte.${since}&select=trade_date,open,high,low,close,volume&order=trade_date.asc`);
   }catch(e){ console.error(e); }
 
-  // 2) モック組み合わせ設定
   const seed = hashSeed(COMPANY);
-  const wantAllMock = MOCK_Q === '1';
-  const wantNoMock  = MOCK_Q === '0';
-
-  // 3) 統合（不足分のみモック）
-  let rows = [];
-  if (wantAllMock || (!sbRows || sbRows.length===0)){
-    rows = makeMockSeries(currentDays, undefined, undefined, seed);
-    document.getElementById('hint').textContent = 'Mock mode（全モック表示）';
-  } else {
-    // 連続した日付配列を作り、存在しない日をモックで補完（MOCK_Qが0でなければ）
-    const map = new Map(sbRows.map(r=>[r.trade_date, r]));
-    const mockBasePx  = +sbRows.at(-1).close || +sbRows[0].close || 10000;
-    const mockBaseVol = +sbRows.at(-1).volume || 20000;
-    const mockSeries  = makeMockSeries(currentDays, mockBasePx, mockBaseVol, seed);
-    const days = [];
-    const s = new Date(); s.setDate(s.getDate() - currentDays);
-    for(let i=0;i<currentDays;i++){ const d=new Date(s); d.setDate(s.getDate()+i+1); days.push(d.toISOString().slice(0,10)); }
-    rows = days.map(d=>{
-      if (map.has(d)) return map.get(d);
-      if (wantNoMock) return null; // 補完しない
-      // 同日のモックを拾う
-      const m = mockSeries.find(x=>x.trade_date===d);
-      return m;
+  let rows=[];
+  if(MOCK==='1' || !sb || sb.length===0){
+    rows = makeMockLikeSB(DAYS, sb||[], seed);
+    document.getElementById('hint').textContent = 'モックのみ（データ不足のため）';
+  }else{
+    // 連続日付を作り、SBが無い日は「SBのボラ/水準に似せたモック」で補完
+    const list=[]; const s=new Date(); s.setDate(s.getDate()-DAYS);
+    for(let i=0;i<DAYS;i++){ const d=new Date(s); d.setDate(s.getDate()+i+1); list.push(d.toISOString().slice(0,10)); }
+    const map=new Map(sb.map(r=>[r.trade_date, r]));
+    const mock = makeMockLikeSB(DAYS, sb, seed);
+    rows = list.map(d=>{
+      if(map.has(d)) return map.get(d);
+      if(MOCK==='0') return null;
+      return mock.find(x=>x.trade_date===d);
     }).filter(Boolean);
-    document.getElementById('hint').textContent = wantNoMock ? 'SB実データのみ（欠損日は空）' : 'SBデータ＋不足分はモックで補完';
+    document.getElementById('hint').textContent = (MOCK==='0') ? 'SBデータのみ（欠損日は空）' : 'SBデータ＋不足分を似たモックで補完';
   }
 
-  // グローバルに保持（テーマ再描画用）
-  window.currentRows = rows;
-  window.currentDays = currentDays;
-
-  // 4) 描画
-  drawCharts(rows, currentDays);
+  currentRows = rows;
+  drawCharts(rows);
 })();
 </script>
 </body>
