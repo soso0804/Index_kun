@@ -16,13 +16,18 @@
       box-sizing: border-box;
       font-family: sans-serif;
     }
+    /* キャンバスの親に“正方形”の枠を与える */
     #chart-container {
       width: 90%;
-      max-width: 400px;
+      max-width: 420px;
+      aspect-ratio: 1 / 1;     /* ←これで高さが安定 */
+      position: relative;       /* Chart.js 推奨 */
     }
+    /* Chart.js に高さを任せる。auto 指定はしない */
     canvas {
+      display: block;
       width: 100%;
-      height: auto;
+      /* height は指定しない */
     }
     .message {
       text-align: center;
@@ -35,6 +40,7 @@
   <div id="chart-container">
     <canvas id="portfolioChart"></canvas>
   </div>
+
   <script>
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
@@ -94,21 +100,20 @@
               },
               options: {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: true,  // 親の aspect-ratio に従う
 
                 // 円を描くように表示（真上からスタート）
                 rotation: -0.5 * Math.PI,
                 circumference: 2 * Math.PI,
 
-                // 全体のアニメーション
+                // 全体アニメーション
                 animation: {
                   duration: 1200,
                   easing: 'easeOutQuart',
-                  animateRotate: true, // 円弧がスーッと描かれる
-                  animateScale: true   // ふわっと拡大して出現
+                  animateRotate: true,
+                  animateScale: true
                 },
-
-                // スライスごとに少し遅延をかけて順に表示
+                // スライスを少しずつ遅らせて描画
                 animations: {
                   number: {
                     type: 'number',
@@ -123,16 +128,13 @@
                 plugins: {
                   legend: {
                     position: 'bottom',
-                    labels: {
-                      font: { size: 12 }
-                    }
+                    labels: { font: { size: 12 } }
                   },
                   tooltip: {
                     callbacks: {
                       label: function (tooltipItem) {
                         const i = tooltipItem.dataIndex;
-                        const stock = stockValues[i];
-                        return `持ち株数：${stock}株`;
+                        return `持ち株数：${stockValues[i]}株`;
                       }
                     }
                   }
