@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portfolio Chart</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -15,19 +15,15 @@
       height: 100vh;
       box-sizing: border-box;
       font-family: sans-serif;
-      background:#fff;
     }
-    /* 明示的に高さを与える（重要） */
     #chart-container {
       width: 90%;
-      max-width: 420px;
-      height: 420px;          /* ←固定高さで安定表示 */
-      position: relative;
+      max-width: 400px;   /* ←最初の例と同じ */
     }
     canvas {
-      display: block;
       width: 100%;
-      height: 100%;           /* ←autoではなく100%にする */
+      height: auto;       /* ←最初の例と同じ（高さは属性で与える） */
+      display: block;
     }
     .message {
       text-align: center;
@@ -40,12 +36,20 @@
   <div id="chart-container">
     <canvas id="portfolioChart"></canvas>
   </div>
-
   <script>
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     const user_name = urlParams.get('user_name');
     const apiUrl = `https://ddtszhkycoqnffgciucl.supabase.co/functions/v1/GetSheetDataForPieChart_v2?user_name=${user_name}`;
+
+    // ★ Chart.js が正しい半径を計算できるよう、表示直前に正方形の高さを属性で付与
+    function ensureSquareCanvas() {
+      const container = document.getElementById('chart-container');
+      const canvas = document.getElementById('portfolioChart');
+      const w = container.clientWidth || 300;
+      canvas.width = w;   // 属性（HTML属性）で指定
+      canvas.height = w;  // これによりゼロ高さ問題を回避
+    }
 
     if (!user_name) {
       document.getElementById('chart-container').innerHTML = "<p class='message'>まだ株を持っていません。</p>";
@@ -53,7 +57,7 @@
     } else {
       fetch(apiUrl)
         .then(response => {
-          if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+          if (!response.ok) { throw new Error(`HTTP error! Status: ${response.status}`); }
           return response.json();
         })
         .then(data => {
@@ -65,13 +69,16 @@
               return;
             }
 
+            // total_stock の多い順にソート（最初の例と同じ）
             portfolioData = portfolioData.sort((a, b) => b.total_stock - a.total_stock);
 
+            // 上位6社とその他
             const top6 = portfolioData.slice(0, 6);
             const others = portfolioData.slice(6);
 
             const labels = top6.map(item => item.company_name);
             const stockValues = top6.map(item => parseInt(item.total_stock, 10));
+
             const othersTotal = others.reduce((sum, item) => sum + parseInt(item.total_stock, 10), 0);
             if (othersTotal > 0) {
               labels.push("その他");
@@ -79,15 +86,17 @@
             }
 
             const backgroundColors = [
-              '#FF6384', '#36A2EB', '#FFCE56',
-              '#4BC0C0', '#9966FF', '#FF9F40', '#D3D3D3'
+              '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#D3D3D3'
             ];
+
+            // ★ キャンバスの高さをここで確定
+            ensureSquareCanvas();
 
             const ctx = document.getElementById('portfolioChart').getContext('2d');
             new Chart(ctx, {
               type: 'pie',
               data: {
-                labels,
+                labels: labels,
                 datasets: [{
                   label: '持ち株数',
                   data: stockValues,
@@ -96,28 +105,15 @@
                 }]
               },
               options: {
-                responsive: true,
-                maintainAspectRatio: false,   // ←固定高さを優先して描画
-                rotation: -0.5 * Math.PI,
-                circumference: 2 * Math.PI,
-
+                responsive: true,          // 最初の例と同じ
+                maintainAspectRatio: false, // 高さを属性で与えているので false に
+                // ★ 余分な設定は入れず、基本の出現アニメだけ
                 animation: {
-                  duration: 1200,
+                  duration: 1000,
                   easing: 'easeOutQuart',
-                  animateRotate: true,
-                  animateScale: true
+                  animateRotate: true,  // 円弧が描かれる
+                  animateScale: true    // ふわっと拡大
                 },
-                animations: {
-                  number: {
-                    type: 'number',
-                    duration: 1200,
-                    easing: 'easeOutQuart',
-                    delay(ctx) {
-                      return ctx.type === 'data' ? ctx.dataIndex * 120 : 0;
-                    }
-                  }
-                },
-
                 plugins: {
                   legend: {
                     position: 'bottom',
@@ -126,13 +122,19 @@
                   tooltip: {
                     callbacks: {
                       label: function (tooltipItem) {
-                        const i = tooltipItem.dataIndex;
-                        return `持ち株数：${stockValues[i]}株`;
+                        const dataIndex = tooltipItem.dataIndex;
+                        const stock = stockValues[dataIndex];
+                        return `持ち株数：${stock}株`;
                       }
                     }
                   }
                 }
               }
+            });
+
+            // 画面サイズ変更時も高さを付け直して再レイアウト
+            window.addEventListener('resize', () => {
+              ensureSquareCanvas();
             });
           } else {
             if (data.message && data.message.includes("No data found")) {
