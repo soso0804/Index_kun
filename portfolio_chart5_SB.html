@@ -15,19 +15,19 @@
       height: 100vh;
       box-sizing: border-box;
       font-family: sans-serif;
+      background:#fff;
     }
-    /* キャンバスの親に“正方形”の枠を与える */
+    /* 明示的に高さを与える（重要） */
     #chart-container {
       width: 90%;
       max-width: 420px;
-      aspect-ratio: 1 / 1;     /* ←これで高さが安定 */
-      position: relative;       /* Chart.js 推奨 */
+      height: 420px;          /* ←固定高さで安定表示 */
+      position: relative;
     }
-    /* Chart.js に高さを任せる。auto 指定はしない */
     canvas {
       display: block;
       width: 100%;
-      /* height は指定しない */
+      height: 100%;           /* ←autoではなく100%にする */
     }
     .message {
       text-align: center;
@@ -65,16 +65,13 @@
               return;
             }
 
-            // total_stock の多い順にソート
             portfolioData = portfolioData.sort((a, b) => b.total_stock - a.total_stock);
 
-            // 上位6社とその他に分類
             const top6 = portfolioData.slice(0, 6);
             const others = portfolioData.slice(6);
 
             const labels = top6.map(item => item.company_name);
             const stockValues = top6.map(item => parseInt(item.total_stock, 10));
-
             const othersTotal = others.reduce((sum, item) => sum + parseInt(item.total_stock, 10), 0);
             if (othersTotal > 0) {
               labels.push("その他");
@@ -100,20 +97,16 @@
               },
               options: {
                 responsive: true,
-                maintainAspectRatio: true,  // 親の aspect-ratio に従う
-
-                // 円を描くように表示（真上からスタート）
+                maintainAspectRatio: false,   // ←固定高さを優先して描画
                 rotation: -0.5 * Math.PI,
                 circumference: 2 * Math.PI,
 
-                // 全体アニメーション
                 animation: {
                   duration: 1200,
                   easing: 'easeOutQuart',
                   animateRotate: true,
                   animateScale: true
                 },
-                // スライスを少しずつ遅らせて描画
                 animations: {
                   number: {
                     type: 'number',
