@@ -143,15 +143,23 @@ const COMPANY = q.get("company") || "KATOJI";
 const SRC = (q.get("src") || "fixed").toLowerCase();   // fixed | live
 let days = Number(q.get("days") || 180);
 
-/* ===== ユーティリティ ===== */
+/* ===== ユーティリティ（JST / ローカル日付で扱う） ===== */
+function toLocalDateString(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+
 function since(d){
   const s = new Date();
   s.setDate(s.getDate() - d);
-  return s.toISOString().slice(0,10);
+  return toLocalDateString(s);            // ★ ローカル日付
 }
 function todayISO(){
-  return new Date().toISOString().slice(0,10);
+  return toLocalDateString(new Date());   // ★ ローカル日付（JST の今日）
 }
+
 async function fetchJSON(path){
   const r = await fetch(SUPABASE_URL + path, {
     headers:{
@@ -207,7 +215,7 @@ function makeMockLikeSB(days, sbRows, seed){
   for(let i=0;i<days;i++){
     const d = new Date(base);
     d.setDate(base.getDate() + i + 1);
-    const day = d.toISOString().slice(0,10);
+    const day = toLocalDateString(d);   // ★ ローカル日付
 
     const u = Math.max(1e-6, rnd());
     const v = Math.max(1e-6, rnd());
@@ -279,199 +287,3 @@ async function getRows(days){
         close: price,
         volume: 0,
         _fromPrice: true
-      };
-      const idx = sb.findIndex(r => r.trade_date === p.trade_date);
-      if(idx >= 0){
-        sb[idx] = todayRow;
-      }else{
-        sb.push(todayRow);
-        sb.sort((a,b)=>a.trade_date.localeCompare(b.trade_date));
-      }
-    }
-  }catch(e){
-    console.error("price fetch error", e);
-  }
-
-  // 期間分の連続した日付（最後は今日）
-  const dayList = [];
-  const s = new Date();
-  s.setDate(s.getDate() - days);
-  for(let i=0;i<days;i++){
-    const d = new Date(s);
-    d.setDate(s.getDate() + i + 1);
-    dayList.push(d.toISOString().slice(0,10));
-  }
-
-  const seed = hashSeed(COMPANY);
-  const mock = makeMockLikeSB(days, sb, seed);
-  const map  = new Map(sb.map(r => [r.trade_date, r]));
-
-  const merged = dayList.map(d => {
-    return map.get(d) || mock.find(m => m.trade_date === d);
-  });
-
-  return merged.filter(Boolean);
-}
-
-/* ===== 描画 ===== */
-let priceMode = "abs";
-let candleChart, volChart, candleSeries, volSeries, ma5Series, ma25Series;
-
-function movingAverage(rows,n){
-  const out = [];
-  let sum = 0;
-  const buf = [];
-  for(const r of rows){
-    const c = +r.close;
-    buf.push(c);
-    sum += c;
-    if(buf.length > n) sum -= buf.shift();
-    out.push({
-      time: r.trade_date,
-      value: buf.length === n ? +(sum/n).toFixed(2) : NaN
-    });
-  }
-  return out;
-}
-
-function draw(rows){
-  const wrap = document.getElementById("chart-wrap");
-  wrap.innerHTML = '<div id="candle"></div><div id="volume"></div><div class="tooltip hidden" id="tooltip"></div>';
-
-  const cs   = getComputedStyle(document.body);
-  const bg   = cs.getPropertyValue("--bg").trim();
-  const tx   = cs.getPropertyValue("--text").trim();
-  const grid = cs.getPropertyValue("--grid").trim();
-
-  candleChart = LightweightCharts.createChart(document.getElementById("candle"),{
-    layout:{background:{color:bg},textColor:tx},
-    rightPriceScale:{autoScale:true},
-    timeScale:{timeVisible:true,borderVisible:false},
-    grid:{horzLines:{color:grid},vertLines:{color:grid}},
-    handleScroll:{mouseWheel:true,pressedMouseMove:true},
-    handleScale:{axisPressedMouseMove:true,pinch:true},
-    autoSize:true
-  });
-
-  candleSeries = candleChart.addCandlestickSeries({
-    upColor:"#26a69a",
-    downColor:"#ef5350",
-    borderUpColor:"#26a69a",
-    borderDownColor:"#ef5350",
-    wickUpColor:"#26a69a",
-    wickDownColor:"#ef5350"
-  });
-
-  volChart = LightweightCharts.createChart(document.getElementById("volume"),{
-    layout:{background:{color:bg},textColor:tx},
-    rightPriceScale:{autoScale:true},
-    timeScale:{visible:true},
-    grid:{horzLines:{color:grid},vertLines:{color:grid}},
-    handleScroll:{mouseWheel:true,pressedMouseMove:true},
-    handleScale:{axisPressedMouseMove:true,pinch:true},
-    autoSize:true
-  });
-
-  volSeries = volChart.addHistogramSeries({
-    color:getComputedStyle(document.documentElement).getPropertyValue("--vol").trim(),
-    priceFormat:{type:"volume"}
-  });
-
-  const candles = rows.map(r => ({
-    time:  r.trade_date,
-    open:  +r.open,
-    high:  +r.high,
-    low:   +r.low,
-    close: +r.close
-  }));
-  const vols = rows.map(r => ({
-    time:  r.trade_date,
-    value: +(r.volume || 0)
-  }));
-
-  candleSeries.setData(candles);
-  volSeries.setData(vols);
-
-  ma5Series = candleChart.addLineSeries({color:"#5b9bff",lineWidth:2,priceLineVisible:false});
-  ma5Series.setData(movingAverage(rows,5));
-  ma25Series = candleChart.addLineSeries({color:"#c084fc",lineWidth:2,priceLineVisible:false});
-  ma25Series.setData(movingAverage(rows,25));
-
-  candleChart.priceScale("right").applyOptions({
-    mode: priceMode === "pct"
-      ? LightweightCharts.PriceScaleMode.Percentage
-      : LightweightCharts.PriceScaleMode.Normal,
-    autoScale:true
-  });
-
-  const N = rows.length;
-  const logical = {from:0,to:Math.max(1,N-1)};
-  candleChart.timeScale().setVisibleLogicalRange(logical);
-  volChart.timeScale().setVisibleLogicalRange(logical);
-
-  let syncing = false;
-  function bind(a,b){
-    a.timeScale().subscribeVisibleTimeRangeChange(r=>{
-      if(syncing || !r) return;
-      syncing = true;
-      b.timeScale().setVisibleRange(r);
-      syncing = false;
-    });
-    a.timeScale().subscribeVisibleLogicalRangeChange(r=>{
-      if(syncing || !r) return;
-      syncing = true;
-      b.timeScale().setVisibleLogicalRange(r);
-      syncing = false;
-    });
-  }
-  bind(candleChart,volChart);
-  bind(volChart,candleChart);
-}
-
-/* ===== 起動 & UI ===== */
-let currentRows = [];
-
-(async function init(){
-  const sel = document.getElementById("period");
-  if([].some.call(sel.options,o => +o.value === days)){
-    sel.value = String(days);
-  }
-
-  try{
-    currentRows = await getRows(days);
-    draw(currentRows);
-  }catch(e){
-    console.error("init error", e);
-  }
-
-  sel.onchange = async function(e){
-    days = +e.target.value;
-    const u = new URL(location.href);
-    u.searchParams.set("days",days);
-    history.replaceState(null,"",u);
-    currentRows = await getRows(days);
-    draw(currentRows);
-  };
-
-  const percBtn = document.getElementById("toggle-perc");
-  function setPercUI(){
-    if(priceMode === "pct") percBtn.classList.add("active");
-    else percBtn.classList.remove("active");
-  }
-  percBtn.onclick = function(){
-    priceMode = (priceMode === "pct" ? "abs" : "pct");
-    setPercUI();
-    draw(currentRows);
-  };
-  setPercUI();
-
-  const themeBtn = document.getElementById("toggle-theme");
-  themeBtn.onclick = function(){
-    document.body.classList.toggle("light");
-    themeBtn.textContent = document.body.classList.contains("light") ? "☀️" : "🌙";
-    draw(currentRows);
-  };
-})();
-</script>
-</body>
-</html>
