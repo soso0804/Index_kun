@@ -150,16 +150,14 @@ function toLocalDateString(d){
   const day = String(d.getDate()).padStart(2,"0");
   return `${y}-${m}-${day}`;
 }
-
 function since(d){
   const s = new Date();
   s.setDate(s.getDate() - d);
-  return toLocalDateString(s);            // ★ ローカル日付
+  return toLocalDateString(s);
 }
 function todayISO(){
-  return toLocalDateString(new Date());   // ★ ローカル日付（JST の今日）
+  return toLocalDateString(new Date());
 }
-
 async function fetchJSON(path){
   const r = await fetch(SUPABASE_URL + path, {
     headers:{
@@ -215,17 +213,17 @@ function makeMockLikeSB(days, sbRows, seed){
   for(let i=0;i<days;i++){
     const d = new Date(base);
     d.setDate(base.getDate() + i + 1);
-    const day = toLocalDateString(d);   // ★ ローカル日付
+    const day = toLocalDateString(d);   // ローカル日付
 
     const u = Math.max(1e-6, rnd());
     const v = Math.max(1e-6, rnd());
     const z = Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
 
-    const ret   = z * sigma * 0.45;      // ← 変動を少し小さめに
+    const ret   = z * sigma * 0.45;      // 変動を少し小さめに
     const open  = px;
     const close = Math.max(50, open*(1+ret));
 
-    // ← ヒゲの幅も控えめに
+    // ヒゲの幅も控えめに
     const rangeBase  = Math.max(open*0.002, Math.abs(ret)*open*1.2);
     const intraNoise = 150 + 350*rnd();
     const range = rangeBase + intraNoise;
@@ -248,9 +246,8 @@ function makeMockLikeSB(days, sbRows, seed){
   return out;
 }
 
-/* 連続した日付配列を作り、SBが無い日はモックで補完。
-   当日分だけは company_daily_price から取得して上書き。 */
-async function getRows(days){
+/* 1. 過去分（〜前日まで）の OHLCV を取得して、足りない日はモックで補完 */
+async function getOhlcvRows(days){
   const sinceStr = since(days);
   const table = SRC === "live" ? "company_daily_ohlcv_live" : "company_daily_ohlcv";
 
@@ -265,25 +262,244 @@ async function getRows(days){
     console.error("ohlcv fetch error", e);
   }
 
-  // 当日の終値（点）だけ company_daily_price から取ってくる
+  // すでに当日分が ohlcv に入っている場合は、そのまま使う（volume も保持）
+  const today = todayISO();
+  const hasTodayOhlcv = sb.some(r => r.trade_date === today);
+
+  // 期間分の連続した日付（最後は「hasTodayOhlcv なら今日、そうでなければ昨日」）
+  const dayList = [];
+  const end = new Date();
+  if(!hasTodayOhlcv){
+    // 当日の OHLVC が無い場合は、ろうそく足は昨日まで（今日の点は別シリーズで描画）
+    end.setDate(end.getDate() - 1);
+  }
+  const start = new Date(end);
+  start.setDate(start.getDate() - days + 1);
+
+  for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
+    dayList.push(toLocalDateString(d));
+  }
+
+  const seed = hashSeed(COMPANY);
+  const mock = makeMockLikeSB(dayList.length, sb, seed);
+  const map  = new Map(sb.map(r => [r.trade_date, r]));
+
+  const merged = dayList.map(d => {
+    return map.get(d) || mock.find(m => m.trade_date === d);
+  });
+
+  return merged.filter(Boolean);
+}
+
+/* 2. 当日の株価（終値の点）を取得
+      - company_daily_price に当日分があれば { time, value } を返す
+      - 無ければ null
+*/
+async function getTodayPricePoint(ohlcvRows){
+  const today = todayISO();
+  const lastOhlcvDate = ohlcvRows.length ? ohlcvRows[ohlcvRows.length-1].trade_date : null;
+
+  // 既に OHLCV に今日が含まれているなら、点を追加する必要なし
+  if(lastOhlcvDate === today){
+    return null;
+  }
+
   try{
-    const tStr = todayISO();
     const pr = await fetchJSON(
       `/rest/v1/company_daily_price?company_name=eq.${encodeURIComponent(COMPANY)}` +
-      `&trade_date=eq.${tStr}` +
-      `&select=trade_date,current_price,start_price,max_price,min_price,end_price&limit=1`
+      `&trade_date=eq.${today}` +
+      `&select=trade_date,current_price&limit=1`
     );
     if(pr && pr.length){
       const p = pr[0];
-      const price = Number(p.current_price ?? p.end_price);
-      const o = Number(p.start_price ?? price);
-      const h = Number(p.max_price ?? price);
-      const l = Number(p.min_price ?? price);
-      const todayRow = {
-        trade_date: p.trade_date,
-        open:  isNaN(o) ? price : o,
-        high:  isNaN(h) ? price : h,
-        low:   isNaN(l) ? price : l,
-        close: price,
-        volume: 0,
-        _fromPrice: true
+      const price = Number(p.current_price);
+      if(!isNaN(price)){
+        return { time: p.trade_date, value: price };
+      }
+    }
+  }catch(e){
+    console.error("price fetch error", e);
+  }
+  return null;
+}
+
+/* ===== 描画 ===== */
+let priceMode = "abs";
+let candleChart, volChart, candleSeries, volSeries, ma5Series, ma25Series, todaySeries;
+let currentRows = [];
+let currentTodayPoint = null;
+
+function movingAverage(rows,n){
+  const out = [];
+  let sum = 0;
+  const buf = [];
+  for(const r of rows){
+    const c = +r.close;
+    buf.push(c);
+    sum += c;
+    if(buf.length > n) sum -= buf.shift();
+    out.push({
+      time: r.trade_date,
+      value: buf.length === n ? +(sum/n).toFixed(2) : NaN
+    });
+  }
+  return out;
+}
+
+function draw(rows, todayPoint){
+  const wrap = document.getElementById("chart-wrap");
+  wrap.innerHTML = '<div id="candle"></div><div id="volume"></div><div class="tooltip hidden" id="tooltip"></div>';
+
+  const cs   = getComputedStyle(document.body);
+  const bg   = cs.getPropertyValue("--bg").trim();
+  const tx   = cs.getPropertyValue("--text").trim();
+  const grid = cs.getPropertyValue("--grid").trim();
+
+  // --- メインチャート ---
+  candleChart = LightweightCharts.createChart(document.getElementById("candle"),{
+    layout:{background:{color:bg},textColor:tx},
+    rightPriceScale:{autoScale:true},
+    timeScale:{timeVisible:true,borderVisible:false},
+    grid:{horzLines:{color:grid},vertLines:{color:grid}},
+    handleScroll:{mouseWheel:true,pressedMouseMove:true},
+    handleScale:{axisPressedMouseMove:true,pinch:true},
+    autoSize:true
+  });
+
+  candleSeries = candleChart.addCandlestickSeries({
+    upColor:"#26a69a",
+    downColor:"#ef5350",
+    borderUpColor:"#26a69a",
+    borderDownColor:"#ef5350",
+    wickUpColor:"#26a69a",
+    wickDownColor:"#ef5350"
+  });
+
+  const candles = rows.map(r => ({
+    time:  r.trade_date,
+    open:  +r.open,
+    high:  +r.high,
+    low:   +r.low,
+    close: +r.close
+  }));
+  candleSeries.setData(candles);
+
+  // MA
+  ma5Series = candleChart.addLineSeries({color:"#5b9bff",lineWidth:2,priceLineVisible:false});
+  ma5Series.setData(movingAverage(rows,5));
+  ma25Series = candleChart.addLineSeries({color:"#c084fc",lineWidth:2,priceLineVisible:false});
+  ma25Series.setData(movingAverage(rows,25));
+
+  // 当日の終値の点（company_daily_price）
+  if(todayPoint){
+    todaySeries = candleChart.addLineSeries({
+      color:"#ff9800",
+      lineWidth:2,
+      priceLineVisible:false,
+      lastValueVisible:false,
+      crosshairMarkerVisible:true,
+      crosshairMarkerRadius:3
+    });
+    todaySeries.setData([{ time: todayPoint.time, value: todayPoint.value }]);
+  }
+
+  candleChart.priceScale("right").applyOptions({
+    mode: priceMode === "pct"
+      ? LightweightCharts.PriceScaleMode.Percentage
+      : LightweightCharts.PriceScaleMode.Normal,
+    autoScale:true
+  });
+
+  // --- 出来高チャート ---
+  volChart = LightweightCharts.createChart(document.getElementById("volume"),{
+    layout:{background:{color:bg},textColor:tx},
+    rightPriceScale:{autoScale:true},
+    timeScale:{visible:true},
+    grid:{horzLines:{color:grid},vertLines:{color:grid}},
+    handleScroll:{mouseWheel:true,pressedMouseMove:true},
+    handleScale:{axisPressedMouseMove:true,pinch:true},
+    autoSize:true
+  });
+
+  volSeries = volChart.addHistogramSeries({
+    color:getComputedStyle(document.documentElement).getPropertyValue("--vol").trim(),
+    priceFormat:{type:"volume"}
+  });
+
+  const vols = rows.map(r => ({
+    time:  r.trade_date,
+    value: +(r.volume || 0)
+  }));
+  volSeries.setData(vols);
+
+  const N = rows.length;
+  const logical = {from:0,to:Math.max(1,N-1)};
+  candleChart.timeScale().setVisibleLogicalRange(logical);
+  volChart.timeScale().setVisibleLogicalRange(logical);
+
+  let syncing = false;
+  function bind(a,b){
+    a.timeScale().subscribeVisibleTimeRangeChange(r=>{
+      if(syncing || !r) return;
+      syncing = true;
+      b.timeScale().setVisibleRange(r);
+      syncing = false;
+    });
+    a.timeScale().subscribeVisibleLogicalRangeChange(r=>{
+      if(syncing || !r) return;
+      syncing = true;
+      b.timeScale().setVisibleLogicalRange(r);
+      syncing = false;
+    });
+  }
+  bind(candleChart,volChart);
+  bind(volChart,candleChart);
+}
+
+/* ===== 起動 & UI ===== */
+(async function init(){
+  const sel = document.getElementById("period");
+  if([].some.call(sel.options,o => +o.value === days)){
+    sel.value = String(days);
+  }
+
+  try{
+    currentRows = await getOhlcvRows(days);
+    currentTodayPoint = await getTodayPricePoint(currentRows);
+    draw(currentRows, currentTodayPoint);
+  }catch(e){
+    console.error("init error", e);
+  }
+
+  sel.onchange = async function(e){
+    days = +e.target.value;
+    const u = new URL(location.href);
+    u.searchParams.set("days",days);
+    history.replaceState(null,"",u);
+    currentRows = await getOhlcvRows(days);
+    currentTodayPoint = await getTodayPricePoint(currentRows);
+    draw(currentRows, currentTodayPoint);
+  };
+
+  const percBtn = document.getElementById("toggle-perc");
+  function setPercUI(){
+    if(priceMode === "pct") percBtn.classList.add("active");
+    else percBtn.classList.remove("active");
+  }
+  percBtn.onclick = function(){
+    priceMode = (priceMode === "pct" ? "abs" : "pct");
+    setPercUI();
+    draw(currentRows, currentTodayPoint);
+  };
+  setPercUI();
+
+  const themeBtn = document.getElementById("toggle-theme");
+  themeBtn.onclick = function(){
+    document.body.classList.toggle("light");
+    themeBtn.textContent = document.body.classList.contains("light") ? "☀️" : "🌙";
+    draw(currentRows, currentTodayPoint);
+  };
+})();
+</script>
+</body>
+</html>
