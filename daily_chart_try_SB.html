@@ -1,280 +1,276 @@
-<!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8" />
-  <title>Chart</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
-  <style>
-    :root{
-      --bg:#0b0e11; --card:#11151a; --text:#e8eef5; --muted:#9fb3c8; --grid:#1b222b;
-      --up:#26a69a; --down:#ef5350; --accent:#5b9bff; --vol:#f6c945;
-      --shadow: 0 8px 30px rgba(0,0,0,.25);
-    }
-    body.light{ --bg:#f6f8fb; --card:#ffffff; --text:#18212f; --muted:#55697e; --grid:#e9eef5; --shadow:0 8px 30px rgba(31,59,95,.08); }
-    *{ box-sizing:border-box; }
-    body{ margin:0; background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, Arial, sans-serif;}
-    .container{ max-width:1100px; margin:24px auto; padding:0 12px; }
-    .card{ background:var(--card); border-radius:18px; box-shadow:var(--shadow); overflow:hidden; border:1px solid rgba(255,255,255,.06); }
-    .header{ display:flex; align-items:center; justify-content:space-between; padding:14px 16px; gap:12px; border-bottom:1px solid rgba(255,255,255,.08); }
-    .title{ font-size:18px; font-weight:800; letter-spacing:.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .toolbar{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-    .btn{ appearance:none; border:1px solid rgba(255,255,255,.12); color:var(--text); background:transparent; padding:6px 10px; border-radius:10px; cursor:pointer; font-weight:700; }
-    .btn.active{ border-color:var(--accent); color:#fff; background:var(--accent); }
-    .btn.ghost{ border-color:rgba(255,255,255,.18); }
-    .wrap-charts{ display:flex; flex-direction:column; gap:6px; padding:10px; }
-    #candle{ height:420px; width:100%; }
-    #volume{ height:140px; width:100%; }
-    .footer{ padding:10px 14px; color:var(--muted); font-size:12px; display:flex; justify-content:space-between; align-items:center; gap:8px; border-top:1px solid rgba(255,255,255,.08); }
-    .tooltip{ position:absolute; pointer-events:none; background:rgba(14,18,22,.9); color:#eef4ff; padding:8px 10px; border-radius:10px; font-size:12px; box-shadow:0 6px 16px rgba(0,0,0,.35); transform:translate(-50%,-120%); white-space:nowrap; z-index:5; }
-    body.light .tooltip{ background:#121a22; color:#f2f6fc; }
-    .legend{ font-size:12px; color:var(--muted); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; vertical-align:middle; margin-right:6px; }
-    .hidden{ display:none; }
-  </style>
-</head>
-<body class="light">
-  <div class="container">
-    <div class="card">
-      <div class="header">
-        <div class="title" id="title">Loading…</div>
-        <div class="toolbar">
-          <button class="btn" data-days="30">30日</button>
-          <button class="btn active" data-days="90">90日</button>
-          <button class="btn" data-days="180">180日</button>
-          <button class="btn" data-days="365">1年</button>
-          <button class="btn ghost" id="toggle-perc">％</button>
-          <button class="btn ghost" id="toggle-theme">🌗 テーマ</button>
-        </div>
-      </div>
-      <div class="wrap-charts" id="chart-wrap">
-        <div id="candle"></div>
-        <div id="volume"></div>
-        <div class="tooltip hidden" id="tooltip"></div>
-      </div>
-      <div class="footer">
-        <div class="legend">
-          <span><span class="dot" style="background:#5b9bff"></span>MA5</span>
-          <span><span class="dot" style="background:#c084fc"></span>MA25</span>
-          <span><span class="dot" style="background:#f6c945"></span>出来高</span>
-        </div>
-        <div id="hint"></div>
-      </div>
-    </div>
-  </div>
-
 <script>
-/* === Supabase === */
-const SUPABASE_URL = "https://ddtszhkycoqnffgciucl.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdHN6aGt5Y29xbmZmZ2NpdWNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMDExODQsImV4cCI6MjA2NDU3NzE4NH0.hASl_SDEf86hISajh9WQ0o5kVTuWZCV7IJ7y363cN9c";
+/* ===== Supabase設定 ===== */
+const SUPABASE_URL="https://ddtszhkycoqnffgciucl.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdHN6aGt5Y29xbmZmZ2NpdWNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMDExODQsImV4cCI6MjA2NDU3NzE4NH0.hASl_SDEf86hISajh9WQ0o5kVTuWZCV7IJ7y363cN9c";
 
-/* === URL params === */
-const qp = new URLSearchParams(location.search);
-const COMPANY = qp.get('company') || 'KATOJI';
-const SRC     = (qp.get('src') || 'fixed').toLowerCase();   // fixed|live
-const MOCK    = qp.get('mock');                              // '1' full-mock, '0' no-fill, undefined: fill missing
-const DAYS    = Number(qp.get('days') || 90);
+/* ===== URLパラメータ ===== */
+const q=new URLSearchParams(location.search);
+const COMPANY=q.get('company')||'KATOJI';
+const SRC=(q.get('src')||'fixed').toLowerCase();   // fixed | live
+let days=Number(q.get('days')||180);
 
-/* === helpers === */
-const sinceFromDays = (d)=>{ const s=new Date(); s.setDate(s.getDate()-d); return s.toISOString().slice(0,10); };
+/* ===== ユーティリティ ===== */
+const since=(d)=>{const s=new Date(); s.setDate(s.getDate()-d); return s.toISOString().slice(0,10);}
+const todayISO = ()=> new Date().toISOString().slice(0,10);   // ★ 今日(UTC)を date 文字列で
+
 async function fetchJSON(path){
-  const r = await fetch(`${SUPABASE_URL}${path}`, { headers:{ apikey: SUPABASE_ANON_KEY, Authorization:`Bearer ${SUPABASE_ANON_KEY}` }});
-  if(!r.ok) throw new Error(await r.text()); return r.json();
+  const r=await fetch(`${SUPABASE_URL}${path}`,{
+    headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}
+  });
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
 }
 function hashSeed(str){ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h+=(h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);} return Math.abs(h%100000); }
 function prng(seed){ return ()=>{ seed=Math.sin(seed)*10000; return seed-Math.floor(seed); }; }
 function stdev(a){
   if(a.length<2) return 0.02;
-  const m = a.reduce((x,y)=>x+y,0)/a.length;
-  const v = a.reduce((x,y)=>x+(y-m)**2,0)/(a.length-1);
+  const m=a.reduce((x,y)=>x+y,0)/a.length;
+  const v=a.reduce((x,y)=>x+(y-m)**2,0)/(a.length-1);
   return Math.sqrt(v);
 }
-function makeMockLikeSB(days, sbRows, seed){
-  // 終値・出来高の水準とボラティリティ（リターンσ）を推定
-  const closes = sbRows.map(r=>+r.close);
-  const vols   = sbRows.map(r=>+(r.volume||0));
-  const returns = [];
-  for(let i=1;i<closes.length;i++){
-    const r = (closes[i]-closes[i-1])/Math.max(1e-9,closes[i-1]);
-    returns.push(r);
-  }
-  const sigma = Math.max(0.01, Math.min(0.15, stdev(returns)||0.03)); // 1%〜15%にクランプ
-  const startPx  = closes.length? closes[closes.length-1] : 10000;
-  const baseVol  = vols.length?  vols.slice(-Math.min(10,vols.length)).reduce((a,b)=>a+b,0)/Math.min(10,vols.length) : 20000;
 
-  const rnd = prng(seed);
-  const out = [];
-  let px = startPx, vol = baseVol;
-  const base = new Date(); base.setDate(base.getDate()-days);
+/* SB実データの水準・ボラに似せたモックを days 分作成（ローソク幅をやや小さめに調整） */
+function makeMockLikeSB(days, sbRows, seed){
+  const closes=sbRows.map(r=>+r.close);
+  const vols=sbRows.map(r=>+(r.volume||0));
+  const rets=[];
+  for(let i=1;i<closes.length;i++){
+    rets.push((closes[i]-closes[i-1])/Math.max(1e-9,closes[i-1]));
+  }
+  const sigma=Math.max(0.01, Math.min(0.15, stdev(rets)||0.03));
+  let px=closes.length? closes.at(-1) : 10000;
+  let vol=vols.length? vols.slice(-Math.min(vols.length,10)).reduce((a,b)=>a+b,0)/Math.min(vols.length,10) : 20000;
+
+  const rnd=prng(seed);
+  const base=new Date(); base.setDate(base.getDate()-days);
+  const out=[];
   for(let i=0;i<days;i++){
     const d=new Date(base); d.setDate(base.getDate()+i+1);
     const day=d.toISOString().slice(0,10);
-    // 近似正規：Box–Muller っぽい（簡易）
-    const u = Math.max(1e-6, rnd()), v = Math.max(1e-6, rnd());
-    const z = Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); // ~N(0,1)
-    const ret = z * sigma * 0.6;              // 少し抑えて滑らかに
-    const open = px;
-    const close = Math.max(50, open*(1+ret));
-    const range = Math.abs(ret)*open*3 + (500+1000*rnd()); // ATR相当
-    const high  = Math.max(open, close) + range*rnd()*0.4;
-    const low   = Math.min(open, close)  - range*rnd()*0.4;
 
-    px = close;
-    // 出来高は緩やかにトレンドする
-    vol = Math.max(1000, vol*(0.9+0.2*rnd()));
+    const u=Math.max(1e-6, rnd()), v=Math.max(1e-6, rnd());
+    const z=Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+    const ret=z*sigma*0.45;                     // ★ 以前より少し小さめの変動
+    const open=px;
+    const close=Math.max(50, open*(1+ret));
 
+    // ★ 高値・安値のレンジも小さめに
+    const rangeBase = Math.max(open*0.002, Math.abs(ret)*open*1.2);
+    const intraNoise = 150 + 350*rnd();
+    const range = rangeBase + intraNoise;
+    const high=Math.max(open,close) + range*0.25*rnd();
+    const low =Math.min(open,close)  - range*0.25*rnd();
+
+    px=close;
+    vol=Math.max(1000, vol*(0.9+0.2*rnd()));
     out.push({
-      trade_date: day,
-      open:+open.toFixed(2), high:+high.toFixed(2), low:+low.toFixed(2), close:+close.toFixed(2),
-      volume: Math.round(vol)
+      trade_date:day,
+      open:+open.toFixed(2),
+      high:+high.toFixed(2),
+      low:+low.toFixed(2),
+      close:+close.toFixed(2),
+      volume:Math.round(vol)
     });
   }
   return out;
 }
-function ma(rows,n){
-  const out=[]; let s=0,buf=[];
-  for(const r of rows){ buf.push(+r.close); s+=+r.close; if(buf.length>n) s-=buf.shift(); out.push({time:r.trade_date, value:buf.length===n?+(s/n).toFixed(2):NaN}); }
+
+/* 連続した日付配列を作り、SBが無い日はモックで補完。
+   当日分だけは company_daily_price から取得して上書き。 */
+async function getRows(days){
+  const sinceStr=since(days);
+  const table= SRC==='live' ? 'company_daily_ohlcv_live' : 'company_daily_ohlcv';
+
+  let sb=[];
+  try{
+    sb = await fetchJSON(
+      `/rest/v1/${table}?company_name=eq.${encodeURIComponent(COMPANY)}` +
+      `&trade_date=gte.${sinceStr}` +
+      `&select=trade_date,open,high,low,close,volume&order=trade_date.asc`
+    );
+  }catch(e){ console.error(e); }
+
+  // ★ 当日の終値（点）だけ company_daily_price から取ってくる
+  let todayRow = null;
+  try{
+    const tStr = todayISO();
+    const pr = await fetchJSON(
+      `/rest/v1/company_daily_price?company_name=eq.${encodeURIComponent(COMPANY)}` +
+      `&trade_date=eq.${tStr}` +
+      `&select=trade_date,current_price,start_price,max_price,min_price,end_price&limit=1`
+    );
+    if(pr && pr.length){
+      const p = pr[0];
+      const price = Number(p.current_price ?? p.end_price);
+      const o = Number(p.start_price ?? price);
+      const h = Number(p.max_price ?? price);
+      const l = Number(p.min_price ?? price);
+      todayRow = {
+        trade_date: p.trade_date,
+        open: isNaN(o)? price : o,
+        high: isNaN(h)? price : h,
+        low : isNaN(l)? price : l,
+        close: price,
+        volume: 0,           // 出来高は不明なので 0 で OK
+        _fromPrice: true     // （必要ならスタイル切り替えに使えるフラグ）
+      };
+
+      // 既に OHLVC に今日があれば上書き、なければ追加
+      const idx = sb.findIndex(r => r.trade_date === p.trade_date);
+      if(idx >= 0) sb[idx] = todayRow;
+      else { sb.push(todayRow); sb.sort((a,b)=>a.trade_date.localeCompare(b.trade_date)); }
+    }
+  }catch(e){ console.error(e); }
+
+  // 要求期間分の連続日付を作る（最後は今日）
+  const dayList=[];
+  const s=new Date(); s.setDate(s.getDate()-days);
+  for(let i=0;i<days;i++){
+    const d=new Date(s); d.setDate(s.getDate()+i+1);
+    dayList.push(d.toISOString().slice(0,10));
+  }
+
+  const seed=hashSeed(COMPANY);
+  const mock=makeMockLikeSB(days, sb, seed);
+  const map=new Map(sb.map(r=>[r.trade_date, r]));
+
+  const merged = dayList.map(d => {
+    // OHLVC or 当日価格の実データがあればそれを使い、無ければモックで補完
+    return map.get(d) || mock.find(m=>m.trade_date===d);
+  });
+
+  return merged.filter(Boolean);
+}
+
+/* ===== 描画 ===== */
+let priceMode='abs', theme='light';
+let candleChart,volChart,candleSeries,volSeries,ma5Series,ma25Series;
+function movingAverage(rows,n){
+  const out=[]; let sum=0,buf=[];
+  for(const r of rows){
+    const c=+r.close;
+    buf.push(c); sum+=c;
+    if(buf.length>n) sum-=buf.shift();
+    out.push({time:r.trade_date,value:buf.length===n?+(sum/n).toFixed(2):NaN});
+  }
   return out;
 }
 
-/* === globals === */
-let candleChart, volChart, candleSeries, volSeries, ma5Series, ma25Series;
-let priceMode='abs'; // 'abs' | 'pct'
-let currentRows=[], currentDays=DAYS;
-
-/* === draw === */
-function drawCharts(rows){
+function draw(rows){
   const wrap=document.getElementById('chart-wrap');
   wrap.innerHTML=`<div id="candle"></div><div id="volume"></div><div class="tooltip hidden" id="tooltip"></div>`;
-  const candleEl=document.getElementById('candle'), volEl=document.getElementById('volume'), tip=document.getElementById('tooltip');
+  const cs=getComputedStyle(document.body),
+        bg=cs.getPropertyValue('--bg').trim(),
+        tx=cs.getPropertyValue('--text').trim(),
+        grid=cs.getPropertyValue('--grid').trim();
 
-  const cs=getComputedStyle(document.body), bg=cs.getPropertyValue('--card').trim(), tx=cs.getPropertyValue('--text').trim(), grid=cs.getPropertyValue('--grid').trim();
-
-  candleChart=LightweightCharts.createChart(candleEl,{
-    layout:{ background:{color:bg}, textColor:tx },
-    rightPriceScale:{ borderVisible:false, autoScale:true },  // ← 常に自動スケール
-    timeScale:{ borderVisible:false, timeVisible:false, secondsVisible:false },
-    grid:{ horzLines:{color:grid}, vertLines:{color:grid} },
-    localization:{ locale:'ja-JP' },
-    handleScroll:{ mouseWheel:true, pressedMouseMove:true },
-    handleScale:{ axisPressedMouseMove:true, pinch:true },
+  candleChart=LightweightCharts.createChart(document.getElementById('candle'),{
+    layout:{background:{color:bg},textColor:tx},
+    rightPriceScale:{autoScale:true},
+    timeScale:{timeVisible:true,borderVisible:false},
+    grid:{horzLines:{color:grid},vertLines:{color:grid}},
+    handleScroll:{mouseWheel:true,pressedMouseMove:true},
+    handleScale:{axisPressedMouseMove:true,pinch:true},
     autoSize:true,
-    watermark:{ visible:true, text:COMPANY, fontSize:18, color:'rgba(120,140,160,.25)' }
   });
   candleSeries=candleChart.addCandlestickSeries({
-    upColor:'#26a69a', downColor:'#ef5350',
-    wickUpColor:'#26a69a', wickDownColor:'#ef5350',
-    borderUpColor:'#26a69a', borderDownColor:'#ef5350',
-    priceLineVisible:true
+    upColor:'#26a69a',
+    downColor:'#ef5350',
+    borderUpColor:'#26a69a',
+    borderDownColor:'#ef5350',
+    wickUpColor:'#26a69a',
+    wickDownColor:'#ef5350'
   });
 
-  volChart=LightweightCharts.createChart(volEl,{
-    layout:{ background:{color:bg}, textColor:tx },
-    rightPriceScale:{ borderVisible:false, autoScale:true },   // ← 出来高も自動
-    timeScale:{ borderVisible:true, timeVisible:true, secondsVisible:false },
-    grid:{ horzLines:{color:grid}, vertLines:{color:grid} },
-    localization:{ locale:'ja-JP' },
-    handleScroll:{ mouseWheel:true, pressedMouseMove:true },
-    handleScale:{ axisPressedMouseMove:true, pinch:true },
+  volChart=LightweightCharts.createChart(document.getElementById('volume'),{
+    layout:{background:{color:bg},textColor:tx},
+    rightPriceScale:{autoScale:true},
+    timeScale:{visible:true},
+    grid:{horzLines:{color:grid},vertLines:{color:grid}},
+    handleScroll:{mouseWheel:true,pressedMouseMove:true},
+    handleScale:{axisPressedMouseMove:true,pinch:true},
     autoSize:true
   });
-  volSeries=volChart.addHistogramSeries({ priceFormat:{type:'volume'}, color:getComputedStyle(document.documentElement).getPropertyValue('--vol').trim(), baseLineVisible:false });
+  volSeries=volChart.addHistogramSeries({
+    color:getComputedStyle(document.documentElement).getPropertyValue('--vol').trim(),
+    priceFormat:{type:'volume'}
+  });
 
-  // data
-  const candles=rows.map(r=>({time:r.trade_date, open:+r.open, high:+r.high, low:+r.low, close:+r.close}));
-  const vols=rows.map(r=>({time:r.trade_date, value:+(r.volume||0)}));
-  const ma5=ma(rows,5), ma25=ma(rows,25);
-  candleSeries.setData(candles); volSeries.setData(vols);
-  ma5Series=candleChart.addLineSeries({ color:'#5b9bff', lineWidth:2, priceLineVisible:false }); ma5Series.setData(ma5);
-  ma25Series=candleChart.addLineSeries({ color:'#c084fc', lineWidth:2, priceLineVisible:false }); ma25Series.setData(ma25);
+  const candles=rows.map(r=>({
+    time:r.trade_date,
+    open:+r.open,
+    high:+r.high,
+    low:+r.low,
+    close:+r.close
+  }));
+  const vols = rows.map(r=>({time:r.trade_date, value:+(r.volume||0)}));
 
-  // ％モード反映
+  candleSeries.setData(candles);
+  volSeries.setData(vols);
+
+  ma5Series=candleChart.addLineSeries({color:'#5b9bff',lineWidth:2,priceLineVisible:false});
+  ma5Series.setData(movingAverage(rows,5));
+  ma25Series=candleChart.addLineSeries({color:'#c084fc',lineWidth:2,priceLineVisible:false});
+  ma25Series.setData(movingAverage(rows,25));
+
   candleChart.priceScale('right').applyOptions({
-    mode: priceMode==='pct' ? LightweightCharts.PriceScaleMode.Percentage
-                            : LightweightCharts.PriceScaleMode.Normal,
+    mode: priceMode==='pct'
+      ? LightweightCharts.PriceScaleMode.Percentage
+      : LightweightCharts.PriceScaleMode.Normal,
     autoScale:true
   });
 
-  // 横幅いっぱい：論理レンジで強制フィット（本数が少ない時の余白を除去）
-  const N = rows.length;
-  const logicalRange = { from: 0, to: Math.max(1, N-1) };
-  candleChart.timeScale().setVisibleLogicalRange(logicalRange);
-  volChart.timeScale().setVisibleLogicalRange(logicalRange);
+  const N=rows.length;
+  const logical={from:0, to:Math.max(1, N-1)};
+  candleChart.timeScale().setVisibleLogicalRange(logical);
+  volChart.timeScale().setVisibleLogicalRange(logical);
 
-  // 完全同期（time & logical）
   let syncing=false;
-  function bind(master, slave){
-    master.timeScale().subscribeVisibleTimeRangeChange(range=>{
-      if(syncing||!range) return; syncing=true; slave.timeScale().setVisibleRange(range); syncing=false;
+  function bind(a,b){
+    a.timeScale().subscribeVisibleTimeRangeChange(r=>{
+      if(syncing||!r) return;
+      syncing=true; b.timeScale().setVisibleRange(r); syncing=false;
     });
-    master.timeScale().subscribeVisibleLogicalRangeChange(range=>{
-      if(syncing||!range) return; syncing=true; slave.timeScale().setVisibleLogicalRange(range); syncing=false;
+    a.timeScale().subscribeVisibleLogicalRangeChange(r=>{
+      if(syncing||!r) return;
+      syncing=true; b.timeScale().setVisibleLogicalRange(r); syncing=false;
     });
   }
   bind(candleChart, volChart); bind(volChart, candleChart);
-
-  // tooltip
-  candleChart.subscribeCrosshairMove(p=>{
-    if(!p || !p.time || !p.point){ tip.classList.add('hidden'); return; }
-    const c=p.seriesData.get(candleSeries), m5=p.seriesData.get(ma5Series), m25=p.seriesData.get(ma25Series), v=p.seriesData.get(volSeries);
-    if(!c){ tip.classList.add('hidden'); return; }
-    tip.classList.remove('hidden');
-    tip.innerHTML = `<b>${p.time}</b><br>O: ${c.open.toLocaleString()} H: ${c.high.toLocaleString()} L: ${c.low.toLocaleString()} C: ${c.close.toLocaleString()}<br>V: ${(v?.value||0).toLocaleString()}　<span style="color:#5b9bff">MA5: ${isFinite(m5?.value)?m5.value.toFixed(2):'-'}</span>　<span style="color:#c084fc">MA25: ${isFinite(m25?.value)?m25.value.toFixed(2):'-'}</span>`;
-    const r=document.getElementById('chart-wrap').getBoundingClientRect();
-    tip.style.left=`${p.point.x+r.left}px`; tip.style.top=`${p.point.y+r.top}px`;
-  });
 }
 
-/* === main === */
-(async function(){
-  document.getElementById('title').textContent = COMPANY;
+/* ===== 起動 & UI ===== */
+let currentRows=[];
+(async function init(){
+  const sel=document.getElementById('period');
+  if([...sel.options].some(o=>+o.value===days)) sel.value=String(days);
 
-  // 期間ボタン
-  [...document.querySelectorAll('.btn[data-days]')].forEach(b=>{
-    b.classList.toggle('active', Number(b.dataset.days)===DAYS);
-    b.onclick=()=>{ const d=Number(b.dataset.days); const u=new URL(location.href); u.searchParams.set('days', d); location.href=u.toString(); };
-  });
+  currentRows = await getRows(days);
+  draw(currentRows);
 
-  // テーマ
-  document.getElementById('toggle-theme').onclick=()=>{ document.body.classList.toggle('light'); drawCharts(currentRows); };
+  sel.onchange = async (e)=>{
+    days=+e.target.value;
+    const u=new URL(location.href);
+    u.searchParams.set('days',days);
+    history.replaceState(null,'',u);
+    currentRows = await getRows(days);
+    draw(currentRows);
+  };
 
-  // ％ボタン
-  const percBtn = document.getElementById('toggle-perc');
-  const setPercBtnUI = ()=> percBtn.classList.toggle('active', priceMode==='pct');
-  percBtn.onclick = ()=>{ priceMode = (priceMode==='pct' ? 'abs' : 'pct'); setPercBtnUI(); drawCharts(currentRows); };
-  setPercBtnUI();
+  const percBtn=document.getElementById('toggle-perc');
+  const setPercUI=()=>percBtn.classList.toggle('active', priceMode==='pct');
+  percBtn.onclick=()=>{
+    priceMode=(priceMode==='pct'?'abs':'pct');
+    setPercUI();
+    draw(currentRows);
+  };
+  setPercUI();
 
-  const since = sinceFromDays(DAYS);
-  const table = SRC==='live' ? 'company_daily_ohlcv_live' : 'company_daily_ohlcv';
-
-  // SBデータ取得
-  let sb=[];
-  try{
-    sb = await fetchJSON(`/rest/v1/${table}?company_name=eq.${encodeURIComponent(COMPANY)}&trade_date=gte.${since}&select=trade_date,open,high,low,close,volume&order=trade_date.asc`);
-  }catch(e){ console.error(e); }
-
-  const seed = hashSeed(COMPANY);
-  let rows=[];
-  if(MOCK==='1' || !sb || sb.length===0){
-    rows = makeMockLikeSB(DAYS, sb||[], seed);
-    document.getElementById('hint').textContent = 'モックのみ（データ不足のため）';
-  }else{
-    // 連続日付を作り、SBが無い日は「SBのボラ/水準に似せたモック」で補完
-    const list=[]; const s=new Date(); s.setDate(s.getDate()-DAYS);
-    for(let i=0;i<DAYS;i++){ const d=new Date(s); d.setDate(s.getDate()+i+1); list.push(d.toISOString().slice(0,10)); }
-    const map=new Map(sb.map(r=>[r.trade_date, r]));
-    const mock = makeMockLikeSB(DAYS, sb, seed);
-    rows = list.map(d=>{
-      if(map.has(d)) return map.get(d);
-      if(MOCK==='0') return null;
-      return mock.find(x=>x.trade_date===d);
-    }).filter(Boolean);
-    document.getElementById('hint').textContent = (MOCK==='0') ? 'SBデータのみ（欠損日は空）' : 'SBデータ＋不足分を似たモックで補完';
-  }
-
-  currentRows = rows;
-  drawCharts(rows);
+  const themeBtn=document.getElementById('toggle-theme');
+  themeBtn.onclick=()=>{
+    document.body.classList.toggle('light');
+    themeBtn.textContent = document.body.classList.contains('light') ? '☀️' : '🌙';
+    draw(currentRows);
+  };
 })();
 </script>
-</body>
-</html>
