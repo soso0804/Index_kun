@@ -7,99 +7,41 @@
 <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 :root{
-  --bg:#0b0e11;
-  --card:#11151a;
-  --text:#e8eef5;
-  --muted:#9fb3c8;
-  --grid:#1b222b;
-  --up:#26a69a;
-  --down:#ef5350;
-  --accent:#5b9bff;
-  --vol:#f6c945;
+  --bg:#0b0e11; --card:#11151a; --text:#e8eef5; --muted:#9fb3c8;
+  --grid:#1b222b; --up:#26a69a; --down:#ef5350; --accent:#5b9bff; --vol:#f6c945;
 }
 body.light{
-  --bg:#f7f9fb;
-  --card:#ffffff;
-  --text:#18212f;
-  --muted:#55697e;
-  --grid:#e9eef5;
+  --bg:#f7f9fb; --card:#ffffff; --text:#18212f; --muted:#55697e; --grid:#e9eef5;
 }
 *{ box-sizing:border-box; }
 body{
-  margin:0;
-  background:var(--bg);
-  color:var(--text);
+  margin:0; background:var(--bg); color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Yu Gothic",sans-serif;
   touch-action:manipulation;
 }
-.wrapper{
-  display:flex;
-  flex-direction:column;
-  height:100vh;
-  width:100%;
-}
+.wrapper{ display:flex; flex-direction:column; height:100vh; width:100%; }
 .header{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  justify-content:flex-end;
-  padding:8px 10px;
-  background:var(--card);
-  border-bottom:1px solid rgba(255,255,255,.08);
+  display:flex; gap:8px; align-items:center; justify-content:flex-end;
+  padding:8px 10px; background:var(--card); border-bottom:1px solid rgba(255,255,255,.08);
 }
 .header select,.header button{
-  background:transparent;
-  color:var(--text);
-  border:1px solid rgba(255,255,255,.2);
-  padding:6px 10px;
-  border-radius:8px;
-  font-size:14px;
+  background:transparent; color:var(--text); border:1px solid rgba(255,255,255,.2);
+  padding:6px 10px; border-radius:8px; font-size:14px;
 }
-.header button.active{
-  background:var(--accent);
-  color:#fff;
-  border-color:var(--accent);
-}
-.chart-area{
-  flex:1;
-  display:flex;
-  flex-direction:column;
-  padding:0 6px 2px 6px;
-}
+.header button.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
+.chart-area{ flex:1; display:flex; flex-direction:column; padding:0 6px 2px 6px; }
 #candle{ flex:4; width:100%; }
 #volume{ flex:1.2; width:100%; }
-.footer{
-  background:var(--card);
-  border-top:1px solid rgba(255,255,255,.08);
-  padding:6px 10px;
-}
+.footer{ background:var(--card); border-top:1px solid rgba(255,255,255,.08); padding:6px 10px; }
 .legend{
-  font-size:11px;
-  color:var(--muted);
-  display:flex;
-  gap:12px;
-  align-items:center;
-  flex-wrap:wrap;
-  justify-content:center;
+  font-size:11px; color:var(--muted); display:flex; gap:12px; align-items:center;
+  flex-wrap:wrap; justify-content:center;
 }
-.dot{
-  width:8px;
-  height:8px;
-  border-radius:50%;
-  display:inline-block;
-  margin-right:6px;
-}
+.dot{ width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
 .tooltip{
-  position:absolute;
-  pointer-events:none;
-  background:rgba(0,0,0,.7);
-  color:#fff;
-  font-size:11px;
-  padding:6px 8px;
-  border-radius:6px;
-  white-space:nowrap;
-  z-index:10;
-  transform:translate(-50%,-120%);
+  position:absolute; pointer-events:none; background:rgba(0,0,0,.7); color:#fff;
+  font-size:11px; padding:6px 8px; border-radius:6px; white-space:nowrap;
+  z-index:10; transform:translate(-50%,-120%);
 }
 .hidden{ display:none; }
 </style>
@@ -144,38 +86,33 @@ const SRC = (q.get("src") || "fixed").toLowerCase();   // fixed | live
 let days = Number(q.get("days") || 180);
 
 /* ===== 日付ユーティリティ ===== */
-function toLocalDateString(d){
+const toLocalDateString = d => {
   const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,"0");
+  const m = String(d.getMonth() + 1).padStart(2,"0");
   const day = String(d.getDate()).padStart(2,"0");
   return `${y}-${m}-${day}`;
-}
-function since(d){
+};
+const since = d => {
   const s = new Date();
   s.setDate(s.getDate() - d);
   return toLocalDateString(s);
-}
-function todayISO(){
-  return toLocalDateString(new Date());
-}
-// 日付文字列 "YYYY-MM-DD" を n 日シフト
-function addDays(dateStr, n){
+};
+const todayISO = () => toLocalDateString(new Date());
+const addDays = (dateStr, n) => {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + n);
   return toLocalDateString(d);
-}
+};
 
 /* ===== fetch / 乱数ユーティリティ ===== */
 async function fetchJSON(path){
-  const r = await fetch(SUPABASE_URL + path, {
+  const r = await fetch(`${SUPABASE_URL}${path}`, {
     headers:{
       apikey: SUPABASE_KEY,
-      Authorization: "Bearer " + SUPABASE_KEY
+      Authorization: `Bearer ${SUPABASE_KEY}`
     }
   });
-  if(!r.ok){
-    throw new Error(await r.text());
-  }
+  if(!r.ok) throw new Error(await r.text());
   return r.json();
 }
 function hashSeed(str){
@@ -187,7 +124,7 @@ function hashSeed(str){
   return Math.abs(h % 100000);
 }
 function prng(seed){
-  return function(){
+  return () => {
     seed = Math.sin(seed) * 10000;
     return seed - Math.floor(seed);
   };
@@ -195,66 +132,60 @@ function prng(seed){
 function stdev(a){
   if(a.length < 2) return 0.02;
   const m = a.reduce((x,y)=>x+y,0) / a.length;
-  const v = a.reduce((x,y)=>x + (y-m)*(y-m),0) / (a.length-1);
+  const v = a.reduce((x,y)=>x+(y-m)**2,0) / (a.length-1);
   return Math.sqrt(v);
 }
 
-/* SB実データの水準・ボラに似せたモックを days 分作成（昔の版） */
+/* SB実データの水準・ボラに似せたモックを days 分作成 */
 function makeMockLikeSB(days, sbRows, seed){
-  const closes = sbRows.map(r => +r.close);
-  const vols   = sbRows.map(r => +(r.volume || 0));
-  const rets = [];
+  const closes = sbRows.map(r=>+r.close);
+  const vols   = sbRows.map(r=>+(r.volume||0));
+  const rets   = [];
   for(let i=1;i<closes.length;i++){
-    rets.push((closes[i]-closes[i-1]) / Math.max(1e-9, closes[i-1]));
+    rets.push((closes[i]-closes[i-1])/Math.max(1e-9,closes[i-1]));
   }
-  const sigma = Math.max(0.01, Math.min(0.15, stdev(rets) || 0.03));
-  let px  = closes.length ? closes[closes.length-1] : 10000;
+  const sigma = Math.max(0.01, Math.min(0.15, stdev(rets)||0.03));
+  let px  = closes.length ? closes.at(-1) : 10000;
   let vol = vols.length
-    ? vols.slice(-Math.min(vols.length,10)).reduce((a,b)=>a+b,0) / Math.min(vols.length,10)
+    ? vols.slice(-Math.min(vols.length,10)).reduce((a,b)=>a+b,0)/Math.min(vols.length,10)
     : 20000;
 
   const rnd  = prng(seed);
-  const base = new Date();
-  base.setDate(base.getDate() - days);
-  const out = [];
+  const base = new Date(); base.setDate(base.getDate() - days);
+  const out  = [];
 
   for(let i=0;i<days;i++){
     const d = new Date(base);
     d.setDate(base.getDate() + i + 1);
     const day = toLocalDateString(d);
 
-    const u = Math.max(1e-6, rnd());
-    const v = Math.max(1e-6, rnd());
+    const u = Math.max(1e-6, rnd()), v = Math.max(1e-6, rnd());
     const z = Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+    const ret = z * sigma * 0.6;
 
-    const ret   = z * sigma * 0.45;      // 少しマイルド
     const open  = px;
-    const close = Math.max(50, open*(1+ret));
-
-    const rangeBase  = Math.max(open*0.002, Math.abs(ret)*open*1.2);
-    const intraNoise = 150 + 350*rnd();
-    const range = rangeBase + intraNoise;
-
-    const high = Math.max(open, close) + range*0.25*rnd();
-    const low  = Math.min(open, close)  - range*0.25*rnd();
+    const close = Math.max(50, open * (1 + ret));
+    const range = Math.abs(ret)*open*3 + (500 + 1000*rnd());
+    const high  = Math.max(open, close) + range*rnd()*0.4;
+    const low   = Math.min(open, close)  - range*rnd()*0.4;
 
     px  = close;
     vol = Math.max(1000, vol*(0.9 + 0.2*rnd()));
 
     out.push({
       trade_date: day,
-      open:  +open.toFixed(2),
-      high:  +high.toFixed(2),
-      low:   +low.toFixed(2),
-      close: +close.toFixed(2),
-      volume: Math.round(vol)
+      open:+open.toFixed(2),
+      high:+high.toFixed(2),
+      low:+low.toFixed(2),
+      close:+close.toFixed(2),
+      volume:Math.round(vol)
     });
   }
   return out;
 }
 
-/* 1. OHLCV + モック補完（ロジックは元に戻しつつ O(n) 化） */
-async function getOhlcvRows(days){
+/* 連続した日付配列を作り、SBが無い日はモックで補完 */
+async function getRows(days){
   const sinceStr = since(days);
   const table = SRC === "live" ? "company_daily_ohlcv_live" : "company_daily_ohlcv";
 
@@ -265,47 +196,34 @@ async function getOhlcvRows(days){
       `&trade_date=gte.${sinceStr}` +
       `&select=trade_date,open,high,low,close,volume&order=trade_date.asc`
     );
-  }catch(e){
-    console.error("ohlcv fetch error", e);
-  }
+  }catch(e){ console.error(e); }
 
-  const today = todayISO();
-  const hasTodayOhlcv = sb.some(r => r.trade_date === today);
-
-  // 期間分の日付リスト（最後は hasTodayOhlcv ? 今日 : 昨日）
   const dayList = [];
-  const end = new Date();
-  if(!hasTodayOhlcv){
-    end.setDate(end.getDate() - 1);
-  }
-  const start = new Date(end);
-  start.setDate(start.getDate() - days + 1);
-
-  for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  for(let i=0;i<days;i++){
+    const d = new Date(start);
+    d.setDate(start.getDate() + i + 1);
     dayList.push(toLocalDateString(d));
   }
 
   const seed = hashSeed(COMPANY);
-  const mock = makeMockLikeSB(dayList.length, sb, seed);
+  const mock = makeMockLikeSB(days, sb, seed);
 
   const sbMap   = new Map(sb.map(r   => [r.trade_date, r]));
   const mockMap = new Map(mock.map(r => [r.trade_date, r]));
 
-  // ★ ここを O(n) に最適化：find をやめて Map 2本で解決
   const merged = dayList.map(d => sbMap.get(d) || mockMap.get(d));
-
   return merged.filter(Boolean);
 }
 
-/* 2. 当日の株価（終値の点）を取得 */
-async function getTodayPricePoint(ohlcvRows){
+/* 当日の株価（company_daily_price）を取得して仮想ラインに追加 */
+async function getTodayPricePoint(rows){
   const today = todayISO();
-  const lastOhlcvDate = ohlcvRows.length ? ohlcvRows[ohlcvRows.length-1].trade_date : null;
-
-  if(lastOhlcvDate === today){
+  if(rows.length && rows[rows.length-1].trade_date === today){
+    // すでにOHLCVに今日があるなら追加不要
     return null;
   }
-
   try{
     const pr = await fetchJSON(
       `/rest/v1/company_daily_price?company_name=eq.${encodeURIComponent(COMPANY)}` +
@@ -327,22 +245,19 @@ async function getTodayPricePoint(ohlcvRows){
 
 /* ===== 描画 ===== */
 let priceMode = "abs";
-let candleChart, volChart, candleSeries, volSeries, ma5Series, ma25Series, todaySeries;
+let candleChart, volChart, candleSeries, volSeries, ma5Series, ma25Series, virtualSeries;
 let currentRows = [];
 let currentTodayPoint = null;
 
 function movingAverage(rows,n){
-  const out = [];
-  let sum = 0;
-  const buf = [];
+  const out=[]; let sum=0, buf=[];
   for(const r of rows){
     const c = +r.close;
-    buf.push(c);
-    sum += c;
-    if(buf.length > n) sum -= buf.shift();
+    buf.push(c); sum+=c;
+    if(buf.length>n) sum-=buf.shift();
     out.push({
       time: r.trade_date,
-      value: buf.length === n ? +(sum/n).toFixed(2) : NaN
+      value: buf.length===n ? +(sum/n).toFixed(2) : NaN
     });
   }
   return out;
@@ -350,14 +265,18 @@ function movingAverage(rows,n){
 
 function draw(rows, todayPoint){
   const wrap = document.getElementById("chart-wrap");
-  wrap.innerHTML = '<div id="candle"></div><div id="volume"></div><div class="tooltip hidden" id="tooltip"></div>';
+  wrap.innerHTML = `
+    <div id="candle"></div>
+    <div id="volume"></div>
+    <div class="tooltip hidden" id="tooltip"></div>
+  `;
 
   const cs   = getComputedStyle(document.body);
   const bg   = cs.getPropertyValue("--bg").trim();
   const tx   = cs.getPropertyValue("--text").trim();
   const grid = cs.getPropertyValue("--grid").trim();
 
-  // --- メインチャート ---
+  // ---- メインチャート ----
   candleChart = LightweightCharts.createChart(document.getElementById("candle"),{
     layout:{background:{color:bg},textColor:tx},
     rightPriceScale:{autoScale:true},
@@ -369,12 +288,9 @@ function draw(rows, todayPoint){
   });
 
   candleSeries = candleChart.addCandlestickSeries({
-    upColor:"#26a69a",
-    downColor:"#ef5350",
-    borderUpColor:"#26a69a",
-    borderDownColor:"#ef5350",
-    wickUpColor:"#26a69a",
-    wickDownColor:"#ef5350"
+    upColor:"#26a69a", downColor:"#ef5350",
+    borderUpColor:"#26a69a", borderDownColor:"#ef5350",
+    wickUpColor:"#26a69a", wickDownColor:"#ef5350"
   });
 
   const candles = rows.map(r => ({
@@ -392,8 +308,8 @@ function draw(rows, todayPoint){
   ma25Series = candleChart.addLineSeries({color:"#c084fc",lineWidth:2,priceLineVisible:false});
   ma25Series.setData(movingAverage(rows,25));
 
-  // ===== 仮想値ライン＋当日価格 =====
-  todaySeries = candleChart.addLineSeries({
+  // 仮想的なライン（各足の翌日に終値を1本先まで置く ＋ 当日の株価）
+  virtualSeries = candleChart.addLineSeries({
     color:"#ff9800",
     lineWidth:2,
     priceLineVisible:false,
@@ -402,17 +318,11 @@ function draw(rows, todayPoint){
     crosshairMarkerRadius:3
   });
 
-  const virtualPoints = [];
+  const virtualPoints = rows.map(r => ({
+    time:  addDays(r.trade_date, 1),  // 右に1日ずらした位置
+    value: +r.close
+  }));
 
-  // 過去分：各ローソクの翌日位置にその日の終値
-  rows.forEach(r => {
-    virtualPoints.push({
-      time:  addDays(r.trade_date, 1),
-      value: +r.close
-    });
-  });
-
-  // 当日分があれば末尾に追加
   if(todayPoint){
     virtualPoints.push({
       time:  todayPoint.time,
@@ -420,9 +330,10 @@ function draw(rows, todayPoint){
     });
   }
 
-  virtualPoints.sort((a,b) => (a.time < b.time ? -1 : 1));
-  todaySeries.setData(virtualPoints);
+  virtualPoints.sort((a,b)=> (a.time < b.time ? -1 : 1));
+  virtualSeries.setData(virtualPoints);
 
+  // 価格スケールモード
   candleChart.priceScale("right").applyOptions({
     mode: priceMode === "pct"
       ? LightweightCharts.PriceScaleMode.Percentage
@@ -430,7 +341,7 @@ function draw(rows, todayPoint){
     autoScale:true
   });
 
-  // --- 出来高チャート ---
+  // ---- 出来高チャート ----
   volChart = LightweightCharts.createChart(document.getElementById("volume"),{
     layout:{background:{color:bg},textColor:tx},
     rightPriceScale:{autoScale:true},
@@ -452,71 +363,70 @@ function draw(rows, todayPoint){
   }));
   volSeries.setData(vols);
 
-  // 初期表示で当日の仮想値まで含めて見えるようにする
+  // 初期表示レンジ：ローソク足の1本右（仮想ライン分）まで含めて表示
   const logicalTo = rows.length + 1;
-  const logical = {from:0,to:Math.max(1,logicalTo)};
-  candleChart.timeScale().setVisibleLogicalRange(logical);
-  volChart.timeScale().setVisibleLogicalRange(logical);
+  const logicalRange = {from:0, to:Math.max(1, logicalTo)};
+  candleChart.timeScale().setVisibleLogicalRange(logicalRange);
+  volChart.timeScale().setVisibleLogicalRange(logicalRange);
 
-  // スクロール同期
+  // 2つのチャートのスクロール・ズームを同期
   let syncing = false;
   function bind(a,b){
     a.timeScale().subscribeVisibleTimeRangeChange(r=>{
       if(syncing || !r) return;
-      syncing = true;
-      b.timeScale().setVisibleRange(r);
-      syncing = false;
+      syncing = true; b.timeScale().setVisibleRange(r); syncing = false;
     });
     a.timeScale().subscribeVisibleLogicalRangeChange(r=>{
       if(syncing || !r) return;
-      syncing = true;
-      b.timeScale().setVisibleLogicalRange(r);
-      syncing = false;
+      syncing = true; b.timeScale().setVisibleLogicalRange(r); syncing = false;
     });
   }
-  bind(candleChart,volChart);
-  bind(volChart,candleChart);
+  bind(candleChart, volChart);
+  bind(volChart, candleChart);
 }
 
 /* ===== 起動 & UI ===== */
 (async function init(){
   const sel = document.getElementById("period");
-  if([].some.call(sel.options,o => +o.value === days)){
+  if([...sel.options].some(o => +o.value === days)){
     sel.value = String(days);
   }
 
   try{
-    currentRows = await getOhlcvRows(days);
+    currentRows = await getRows(days);
     currentTodayPoint = await getTodayPricePoint(currentRows);
     draw(currentRows, currentTodayPoint);
   }catch(e){
     console.error("init error", e);
   }
 
-  sel.onchange = async function(e){
+  // 期間変更
+  sel.onchange = async e => {
     days = +e.target.value;
     const u = new URL(location.href);
-    u.searchParams.set("days",days);
-    history.replaceState(null,"",u);
-    currentRows = await getOhlcvRows(days);
+    u.searchParams.set("days", days);
+    history.replaceState(null, "", u);
+
+    currentRows = await getRows(days);
     currentTodayPoint = await getTodayPricePoint(currentRows);
     draw(currentRows, currentTodayPoint);
   };
 
+  // ％切替
   const percBtn = document.getElementById("toggle-perc");
-  function setPercUI(){
-    if(priceMode === "pct") percBtn.classList.add("active");
-    else percBtn.classList.remove("active");
-  }
-  percBtn.onclick = function(){
+  const setPercUI = () => {
+    percBtn.classList.toggle("active", priceMode === "pct");
+  };
+  percBtn.onclick = () => {
     priceMode = (priceMode === "pct" ? "abs" : "pct");
     setPercUI();
     draw(currentRows, currentTodayPoint);
   };
   setPercUI();
 
+  // テーマ切替
   const themeBtn = document.getElementById("toggle-theme");
-  themeBtn.onclick = function(){
+  themeBtn.onclick = () => {
     document.body.classList.toggle("light");
     themeBtn.textContent = document.body.classList.contains("light") ? "☀️" : "🌙";
     draw(currentRows, currentTodayPoint);
