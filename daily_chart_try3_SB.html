@@ -143,7 +143,7 @@ const COMPANY = q.get("company") || "KATOJI";
 const SRC = (q.get("src") || "fixed").toLowerCase();   // fixed | live
 let days = Number(q.get("days") || 180);
 
-/* ===== ユーティリティ（JST / ローカル日付で扱う） ===== */
+/* ===== 日付ユーティリティ ===== */
 function toLocalDateString(d){
   const y = d.getFullYear();
   const m = String(d.getMonth()+1).padStart(2,"0");
@@ -158,6 +158,14 @@ function since(d){
 function todayISO(){
   return toLocalDateString(new Date());
 }
+// 日付文字列 "YYYY-MM-DD" を n 日シフト
+function addDays(dateStr, n){
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return toLocalDateString(d);
+}
+
+/* ===== fetch / 乱数ユーティリティ ===== */
 async function fetchJSON(path){
   const r = await fetch(SUPABASE_URL + path, {
     headers:{
@@ -191,14 +199,7 @@ function stdev(a){
   return Math.sqrt(v);
 }
 
-// 日付文字列 "YYYY-MM-DD" を n 日だけシフト
-function addDays(dateStr, n){
-  const d = new Date(dateStr + "T00:00:00");
-  d.setDate(d.getDate() + n);
-  return toLocalDateString(d);
-}
-
-/* SB実データの水準・ボラに似せたモックを days 分作成（ローソク幅をやや小さめに調整） */
+/* SB実データの水準・ボラに似せたモックを days 分作成（昔の版） */
 function makeMockLikeSB(days, sbRows, seed){
   const closes = sbRows.map(r => +r.close);
   const vols   = sbRows.map(r => +(r.volume || 0));
@@ -220,17 +221,16 @@ function makeMockLikeSB(days, sbRows, seed){
   for(let i=0;i<days;i++){
     const d = new Date(base);
     d.setDate(base.getDate() + i + 1);
-    const day = toLocalDateString(d);   // ローカル日付
+    const day = toLocalDateString(d);
 
     const u = Math.max(1e-6, rnd());
     const v = Math.max(1e-6, rnd());
     const z = Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
 
-    const ret   = z * sigma * 0.45;      // 変動を少し小さめに
+    const ret   = z * sigma * 0.45;      // 少しマイルド
     const open  = px;
     const close = Math.max(50, open*(1+ret));
 
-    // ヒゲの幅も控えめに
     const rangeBase  = Math.max(open*0.002, Math.abs(ret)*open*1.2);
     const intraNoise = 150 + 350*rnd();
     const range = rangeBase + intraNoise;
@@ -253,7 +253,7 @@ function makeMockLikeSB(days, sbRows, seed){
   return out;
 }
 
-/* 1. 過去分（〜前日まで）の OHLCV を取得して、足りない日はモックで補完 */
+/* 1. OHLCV + モック補完（ロジックは元に戻しつつ O(n) 化） */
 async function getOhlcvRows(days){
   const sinceStr = since(days);
   const table = SRC === "live" ? "company_daily_ohlcv_live" : "company_daily_ohlcv";
@@ -269,15 +269,13 @@ async function getOhlcvRows(days){
     console.error("ohlcv fetch error", e);
   }
 
-  // すでに当日分が ohlcv に入っている場合は、そのまま使う（volume も保持）
   const today = todayISO();
   const hasTodayOhlcv = sb.some(r => r.trade_date === today);
 
-  // 期間分の連続した日付（最後は「hasTodayOhlcv なら今日、そうでなければ昨日」）
+  // 期間分の日付リスト（最後は hasTodayOhlcv ? 今日 : 昨日）
   const dayList = [];
   const end = new Date();
   if(!hasTodayOhlcv){
-    // 当日の OHLVC が無い場合は、ろうそく足は昨日まで（今日の点は別シリーズで描画）
     end.setDate(end.getDate() - 1);
   }
   const start = new Date(end);
@@ -289,24 +287,21 @@ async function getOhlcvRows(days){
 
   const seed = hashSeed(COMPANY);
   const mock = makeMockLikeSB(dayList.length, sb, seed);
-  const map  = new Map(sb.map(r => [r.trade_date, r]));
 
-  const merged = dayList.map(d => {
-    return map.get(d) || mock.find(m => m.trade_date === d);
-  });
+  const sbMap   = new Map(sb.map(r   => [r.trade_date, r]));
+  const mockMap = new Map(mock.map(r => [r.trade_date, r]));
+
+  // ★ ここを O(n) に最適化：find をやめて Map 2本で解決
+  const merged = dayList.map(d => sbMap.get(d) || mockMap.get(d));
 
   return merged.filter(Boolean);
 }
 
-/* 2. 当日の株価（終値の点）を取得
-      - company_daily_price に当日分があれば { time, value } を返す
-      - 無ければ null
-*/
+/* 2. 当日の株価（終値の点）を取得 */
 async function getTodayPricePoint(ohlcvRows){
   const today = todayISO();
   const lastOhlcvDate = ohlcvRows.length ? ohlcvRows[ohlcvRows.length-1].trade_date : null;
 
-  // 既に OHLCV に今日が含まれているなら、点を追加する必要なし
   if(lastOhlcvDate === today){
     return null;
   }
@@ -397,7 +392,7 @@ function draw(rows, todayPoint){
   ma25Series = candleChart.addLineSeries({color:"#c084fc",lineWidth:2,priceLineVisible:false});
   ma25Series.setData(movingAverage(rows,25));
 
-  // ===== 仮想的な値ライン（各足の「翌日」にその日の終値をプロット）＋ 当日価格 =====
+  // ===== 仮想値ライン＋当日価格 =====
   todaySeries = candleChart.addLineSeries({
     color:"#ff9800",
     lineWidth:2,
@@ -409,15 +404,15 @@ function draw(rows, todayPoint){
 
   const virtualPoints = [];
 
-  // 過去分：各ローソクの「翌日」にその日の終値を置く
+  // 過去分：各ローソクの翌日位置にその日の終値
   rows.forEach(r => {
     virtualPoints.push({
-      time:  addDays(r.trade_date, 1),   // 1日右にずらした位置
+      time:  addDays(r.trade_date, 1),
       value: +r.close
     });
   });
 
-  // 当日分：company_daily_price があればそのまま追加
+  // 当日分があれば末尾に追加
   if(todayPoint){
     virtualPoints.push({
       time:  todayPoint.time,
@@ -425,11 +420,9 @@ function draw(rows, todayPoint){
     });
   }
 
-  // 時間順に並べてセット
   virtualPoints.sort((a,b) => (a.time < b.time ? -1 : 1));
   todaySeries.setData(virtualPoints);
 
-  // 価格スケールモード
   candleChart.priceScale("right").applyOptions({
     mode: priceMode === "pct"
       ? LightweightCharts.PriceScaleMode.Percentage
@@ -459,13 +452,13 @@ function draw(rows, todayPoint){
   }));
   volSeries.setData(vols);
 
-  // ===== 初期表示で当日の仮想値まで含めて見えるようにする =====
-  const logicalTo = rows.length + 1; // ローソク足より1本右（仮想値ぶん）まで
+  // 初期表示で当日の仮想値まで含めて見えるようにする
+  const logicalTo = rows.length + 1;
   const logical = {from:0,to:Math.max(1,logicalTo)};
   candleChart.timeScale().setVisibleLogicalRange(logical);
   volChart.timeScale().setVisibleLogicalRange(logical);
 
-  // チャート同士のスクロール同期
+  // スクロール同期
   let syncing = false;
   function bind(a,b){
     a.timeScale().subscribeVisibleTimeRangeChange(r=>{
