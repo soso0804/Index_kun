@@ -6,22 +6,101 @@
 <title>チャート</title>
 <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 <style>
-:root{ --bg:#0b0e11; --card:#11151a; --text:#e8eef5; --muted:#9fb3c8; --grid:#1b222b; --up:#26a69a; --down:#ef5350; --accent:#5b9bff; --vol:#f6c945; }
-body.light{ --bg:#f7f9fb; --card:#ffffff; --text:#18212f; --muted:#55697e; --grid:#e9eef5; }
+:root{
+  --bg:#0b0e11;
+  --card:#11151a;
+  --text:#e8eef5;
+  --muted:#9fb3c8;
+  --grid:#1b222b;
+  --up:#26a69a;
+  --down:#ef5350;
+  --accent:#5b9bff;
+  --vol:#f6c945;
+}
+body.light{
+  --bg:#f7f9fb;
+  --card:#ffffff;
+  --text:#18212f;
+  --muted:#55697e;
+  --grid:#e9eef5;
+}
 *{ box-sizing:border-box; }
-body{ margin:0; background:var(--bg); color:var(--text);
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Yu Gothic",sans-serif; touch-action:manipulation; }
-.wrapper{ display:flex; flex-direction:column; height:100vh; width:100%; }
-.header{ display:flex; gap:8px; align-items:center; justify-content:flex-end; padding:8px 10px; background:var(--card); border-bottom:1px solid rgba(255,255,255,.08); }
-.header select,.header button{ background:transparent; color:var(--text); border:1px solid rgba(255,255,255,.2); padding:6px 10px; border-radius:8px; font-size:14px; }
-.header button.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
-.chart-area{ flex:1; display:flex; flex-direction:column; padding:0 6px 2px 6px; }
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Yu Gothic",sans-serif;
+  touch-action:manipulation;
+}
+.wrapper{
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+  width:100%;
+}
+.header{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  justify-content:flex-end;
+  padding:8px 10px;
+  background:var(--card);
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.header select,.header button{
+  background:transparent;
+  color:var(--text);
+  border:1px solid rgba(255,255,255,.2);
+  padding:6px 10px;
+  border-radius:8px;
+  font-size:14px;
+}
+.header button.active{
+  background:var(--accent);
+  color:#fff;
+  border-color:var(--accent);
+}
+.chart-area{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  padding:0 6px 2px 6px;
+}
 #candle{ flex:4; width:100%; }
 #volume{ flex:1.2; width:100%; }
-.footer{ background:var(--card); border-top:1px solid rgba(255,255,255,.08); padding:6px 10px; }
-.legend{ font-size:11px; color:var(--muted); display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:center; }
-.dot{ width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
-.tooltip{ position:absolute; pointer-events:none; background:rgba(0,0,0,.7); color:#fff; font-size:11px; padding:6px 8px; border-radius:6px; white-space:nowrap; z-index:10; transform:translate(-50%,-120%); }
+.footer{
+  background:var(--card);
+  border-top:1px solid rgba(255,255,255,.08);
+  padding:6px 10px;
+}
+.legend{
+  font-size:11px;
+  color:var(--muted);
+  display:flex;
+  gap:12px;
+  align-items:center;
+  flex-wrap:wrap;
+  justify-content:center;
+}
+.dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  display:inline-block;
+  margin-right:6px;
+}
+.tooltip{
+  position:absolute;
+  pointer-events:none;
+  background:rgba(0,0,0,.7);
+  color:#fff;
+  font-size:11px;
+  padding:6px 8px;
+  border-radius:6px;
+  white-space:nowrap;
+  z-index:10;
+  transform:translate(-50%,-120%);
+}
 .hidden{ display:none; }
 </style>
 </head>
@@ -55,96 +134,307 @@ body{ margin:0; background:var(--bg); color:var(--text);
 
 <script>
 /* ===== Supabase設定 ===== */
-const SUPABASE_URL="https://ddtszhkycoqnffgciucl.supabase.co";
-const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdHN6aGt5Y29xbmZmZ2NpdWNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMDExODQsImV4cCI6MjA2NDU3NzE4NH0.hASl_SDEf86hISajh9WQ0o5kVTuWZCV7IJ7y363cN9c";
+const SUPABASE_URL = "https://ddtszhkycoqnffgciucl.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdHN6aGt5Y29xbmZmZ2NpdWNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMDExODQsImV4cCI6MjA2NDU3NzE4NH0.hASl_SDEf86hISajh9WQ0o5kVTuWZCV7IJ7y363cN9c";
 
 /* ===== URLパラメータ ===== */
-const q=new URLSearchParams(location.search);
-const COMPANY=q.get('company')||'KATOJI';
-const SRC=(q.get('src')||'fixed').toLowerCase();   // fixed | live
-let days=Number(q.get('days')||180);
+const q = new URLSearchParams(location.search);
+const COMPANY = q.get("company") || "KATOJI";
+const SRC = (q.get("src") || "fixed").toLowerCase();   // fixed | live
+let days = Number(q.get("days") || 180);
 
-/* ===== ユーティリティ ===== */
-const since=(d)=>{const s=new Date(); s.setDate(s.getDate()-d); return s.toISOString().slice(0,10);}
-async function fetchJSON(path){
-  const r=await fetch(`${SUPABASE_URL}${path}`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}});
-  if(!r.ok) throw new Error(await r.text()); return r.json();
+/* ===== ユーティリティ（ローカル日付/JST） ===== */
+function toLocalDateString(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
 }
-function hashSeed(str){ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h+=(h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);} return Math.abs(h%100000); }
-function prng(seed){ return ()=>{ seed=Math.sin(seed)*10000; return seed-Math.floor(seed); }; }
-function stdev(a){ if(a.length<2) return 0.02; const m=a.reduce((x,y)=>x+y,0)/a.length; const v=a.reduce((x,y)=>x+(y-m)**2,0)/(a.length-1); return Math.sqrt(v); }
+function since(d){
+  const s = new Date();
+  s.setDate(s.getDate() - d);
+  return toLocalDateString(s);
+}
+function todayISO(){
+  return toLocalDateString(new Date());
+}
 
-/* SB実データの水準・ボラに似せたモックを days 分作成 */
-function makeMockLikeSB(days, sbRows, seed){
-  const closes=sbRows.map(r=>+r.close);
-  const vols=sbRows.map(r=>+(r.volume||0));
-  const rets=[]; for(let i=1;i<closes.length;i++) rets.push((closes[i]-closes[i-1])/Math.max(1e-9,closes[i-1]));
-  const sigma=Math.max(0.01, Math.min(0.15, stdev(rets)||0.03));
-  let px=closes.length? closes.at(-1) : 10000;
-  let vol=vols.length? vols.slice(-Math.min(vols.length,10)).reduce((a,b)=>a+b,0)/Math.min(vols.length,10) : 20000;
+/* fetch wrapper */
+async function fetchJSON(path){
+  const r = await fetch(SUPABASE_URL + path, {
+    headers:{
+      apikey: SUPABASE_KEY,
+      Authorization: "Bearer " + SUPABASE_KEY
+    }
+  });
+  if(!r.ok){
+    throw new Error(await r.text());
+  }
+  return r.json();
+}
 
-  const rnd=prng(seed);
-  const base=new Date(); base.setDate(base.getDate()-days);
-  const out=[];
+/* 乱数まわり */
+function hashSeed(str){
+  let h = 2166136261;
+  for(let i=0;i<str.length;i++){
+    h ^= str.charCodeAt(i);
+    h += (h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);
+  }
+  return Math.abs(h % 100000);
+}
+function prng(seed){
+  return function(){
+    seed = Math.sin(seed) * 10000;
+    return seed - Math.floor(seed);
+  };
+}
+function stdev(a){
+  if(a.length < 2) return 0.02;
+  const m = a.reduce((x,y)=>x+y,0) / a.length;
+  const v = a.reduce((x,y)=>x + (y-m)*(y-m),0) / (a.length-1);
+  return Math.sqrt(v);
+}
+
+/* SB実データからボラティリティ推定 */
+function estimateSigma(sbRows){
+  const closes = sbRows.map(r => +r.close).filter(v => !isNaN(v) && v > 0);
+  if(closes.length < 2) return 0.03;
+  const rets = [];
+  for(let i=1;i<closes.length;i++){
+    rets.push((closes[i]-closes[i-1]) / closes[i-1]);
+  }
+  const s = stdev(rets);
+  return Math.max(0.01, Math.min(0.15, s || 0.03));
+}
+
+/* 足りない日付を「現在値に繋がるように」逆向きランダムウォークで埋める */
+function buildContinuousSeries(days, sbRows){
+  // days 分の連続した日付（最後はローカル今日）
+  const dayList = [];
+  const start = new Date();
+  start.setDate(start.getDate() - days);
   for(let i=0;i<days;i++){
-    const d=new Date(base); d.setDate(base.getDate()+i+1);
-    const day=d.toISOString().slice(0,10);
-    const u=Math.max(1e-6, rnd()), v=Math.max(1e-6, rnd());
-    const z=Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
-    const ret=z*sigma*0.6;
-    const open=px;
-    const close=Math.max(50, open*(1+ret));
-    const range=Math.abs(ret)*open*3 + (500+1000*rnd());
-    const high=Math.max(open,close) + range*rnd()*0.4;
-    const low=Math.min(open,close)  - range*rnd()*0.4;
-    px=close;
-    vol=Math.max(1000, vol*(0.9+0.2*rnd()));
-    out.push({trade_date:day, open:+open.toFixed(2), high:+high.toFixed(2), low:+low.toFixed(2), close:+close.toFixed(2), volume:Math.round(vol)});
+    const d = new Date(start);
+    d.setDate(start.getDate() + i + 1);
+    dayList.push(toLocalDateString(d));
+  }
+
+  // 日付→既存行マップ
+  const map = new Map(sbRows.map(r => [r.trade_date, {
+    trade_date: r.trade_date,
+    open:  +r.open,
+    high:  +r.high,
+    low:   +r.low,
+    close: +r.close,
+    volume: +(r.volume || 0)
+  }]));
+
+  const sigma = estimateSigma(sbRows);
+  const closesForAvg = sbRows.map(r => +r.close).filter(v => !isNaN(v));
+  const volsForAvg   = sbRows.map(r => +(r.volume || 0)).filter(v => v > 0);
+  const avgClose = closesForAvg.length
+    ? closesForAvg.reduce((a,b)=>a+b,0) / closesForAvg.length
+    : 10000;
+  const avgVol = volsForAvg.length
+    ? volsForAvg.reduce((a,b)=>a+b,0) / volsForAvg.length
+    : 20000;
+
+  const seed = hashSeed(COMPANY) + days;
+  const rnd  = prng(seed);
+
+  const result = new Array(dayList.length);
+
+  // 後ろから（今日→過去）埋めていく
+  let nextClose = null;
+  let nextVol   = null;
+
+  for(let i = dayList.length - 1; i >= 0; i--){
+    const day = dayList[i];
+    const known = map.get(day);
+
+    if(known){
+      // 実データがある日はそのまま採用し、そこを「アンカー」にする
+      result[i] = known;
+      nextClose = known.close;
+      nextVol   = known.volume || avgVol;
+      continue;
+    }
+
+    // 実データがない日 → 一つ先（未来側）の終値から逆算して生成
+    if(nextClose == null){
+      // 一度も実データが出てこなかった場合（全期間モック）のみここに入る
+      nextClose = avgClose;
+      nextVol   = avgVol;
+    }
+
+    // 正規乱数
+    const u = Math.max(1e-6, rnd());
+    const v = Math.max(1e-6, rnd());
+    const z = Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+
+    // 「翌日の終値 = 当日の終値 * (1 + ret)」とすると、
+    // 当日の終値 = 翌日の終値 / (1 + ret) で過去方向の価格を生成できる
+    const ret = z * sigma * 0.6; // ちょい控えめ
+    const close = Math.max(50, nextClose / (1 + ret));
+
+    // 始値は終値付近に少しだけブレを持たせる
+    const open = close * (1 + (rnd() - 0.5) * 0.02); // ±1%
+
+    // 高値・安値レンジ
+    const rangeBase  = Math.max(close * 0.002, Math.abs(ret) * close * 1.2);
+    const intraNoise = 150 + 350 * rnd();
+    const range = rangeBase + intraNoise;
+
+    const high = Math.max(open, close) + range * 0.25 * rnd();
+    const low  = Math.min(open, close) - range * 0.25 * rnd();
+
+    const vol = Math.max(1000, (nextVol || avgVol) * (0.9 + 0.2 * rnd()));
+
+    result[i] = {
+      trade_date: day,
+      open:  +open.toFixed(2),
+      high:  +high.toFixed(2),
+      low:   +low.toFixed(2),
+      close: +close.toFixed(2),
+      volume: Math.round(vol)
+    };
+
+    nextClose = close;
+    nextVol   = vol;
+  }
+
+  return result.filter(Boolean);
+}
+
+/* OHLCV + 当日価格をまとめて rows にする（連続日付＋欠損はモック補完） */
+async function getRows(days){
+  const sinceStr = since(days);
+  const table = SRC === "live" ? "company_daily_ohlcv_live" : "company_daily_ohlcv";
+
+  let sb = [];
+  try{
+    sb = await fetchJSON(
+      `/rest/v1/${table}?company_name=eq.${encodeURIComponent(COMPANY)}` +
+      `&trade_date=gte.${sinceStr}` +
+      `&select=trade_date,open,high,low,close,volume&order=trade_date.asc`
+    );
+  }catch(e){
+    console.error("ohlcv fetch error", e);
+  }
+
+  // 当日の現在値を company_daily_price から取得して上書き
+  try{
+    const tStr = todayISO();
+    const pr = await fetchJSON(
+      `/rest/v1/company_daily_price?company_name=eq.${encodeURIComponent(COMPANY)}` +
+      `&trade_date=eq.${tStr}` +
+      `&select=trade_date,current_price&limit=1`
+    );
+    if(pr && pr.length){
+      const p = pr[0];
+      const price = Number(p.current_price);
+      if(!isNaN(price)){
+        const todayRow = {
+          trade_date: p.trade_date,
+          open:  price,
+          high:  price,
+          low:   price,
+          close: price,
+          volume: 0
+        };
+        const idx = sb.findIndex(r => r.trade_date === p.trade_date);
+        if(idx >= 0){
+          sb[idx] = todayRow;
+        }else{
+          sb.push(todayRow);
+          sb.sort((a,b)=>a.trade_date.localeCompare(b.trade_date));
+        }
+      }
+    }
+  }catch(e){
+    console.error("price fetch error", e);
+  }
+
+  // 「今日の価格」を含めた実データをアンカーとして、
+  // days 分の連続日付をすべて埋める
+  const continuous = buildContinuousSeries(days, sb);
+  return continuous;
+}
+
+/* ===== 描画 ===== */
+let priceMode = "abs";
+let candleChart, volChart, candleSeries, volSeries, ma5Series, ma25Series;
+let currentRows = [];
+
+function movingAverage(rows,n){
+  const out = [];
+  let sum = 0;
+  const buf = [];
+  for(const r of rows){
+    const c = +r.close;
+    buf.push(c);
+    sum += c;
+    if(buf.length > n) sum -= buf.shift();
+    out.push({
+      time: r.trade_date,
+      value: buf.length === n ? +(sum/n).toFixed(2) : NaN
+    });
   }
   return out;
 }
 
-/* 連続した日付配列を作り、SBが無い日はモックで補完（価格＆出来高 同じ日付集合に） */
-async function getRows(days){
-  const sinceStr=since(days);
-  const table= SRC==='live' ? 'company_daily_ohlcv_live' : 'company_daily_ohlcv';
-  let sb=[];
-  try{
-    sb = await fetchJSON(`/rest/v1/${table}?company_name=eq.${encodeURIComponent(COMPANY)}&trade_date=gte.${sinceStr}&select=trade_date,open,high,low,close,volume&order=trade_date.asc`);
-  }catch(e){ console.error(e); }
-  const dayList=[]; const s=new Date(); s.setDate(s.getDate()-days);
-  for(let i=0;i<days;i++){ const d=new Date(s); d.setDate(s.getDate()+i+1); dayList.push(d.toISOString().slice(0,10)); }
-
-  const seed=hashSeed(COMPANY);
-  const mock=makeMockLikeSB(days, sb, seed);
-  const map=new Map(sb.map(r=>[r.trade_date, r]));
-  // ★ ここで価格＆出来高とも「同じ日付並び」で生成
-  const merged = dayList.map(d => map.get(d) || mock.find(m=>m.trade_date===d));
-  return merged.filter(Boolean);
-}
-
-/* ===== 描画 ===== */
-let priceMode='abs', theme='light';
-let candleChart,volChart,candleSeries,volSeries,ma5Series,ma25Series;
-function movingAverage(rows,n){ const out=[]; let sum=0,buf=[]; for(const r of rows){ const c=+r.close; buf.push(c); sum+=c; if(buf.length>n) sum-=buf.shift(); out.push({time:r.trade_date,value:buf.length===n?+(sum/n).toFixed(2):NaN}); } return out; }
-
 function draw(rows){
-  const wrap=document.getElementById('chart-wrap');
-  wrap.innerHTML=`<div id="candle"></div><div id="volume"></div><div class="tooltip hidden" id="tooltip"></div>`;
-  const cs=getComputedStyle(document.body), bg=cs.getPropertyValue('--bg').trim(), tx=cs.getPropertyValue('--text').trim(), grid=cs.getPropertyValue('--grid').trim();
+  const wrap = document.getElementById("chart-wrap");
+  wrap.innerHTML = '<div id="candle"></div><div id="volume"></div><div class="tooltip hidden" id="tooltip"></div>';
 
-  candleChart=LightweightCharts.createChart(document.getElementById('candle'),{
+  const cs   = getComputedStyle(document.body);
+  const bg   = cs.getPropertyValue("--bg").trim();
+  const tx   = cs.getPropertyValue("--text").trim();
+  const grid = cs.getPropertyValue("--grid").trim();
+
+  // メインチャート
+  candleChart = LightweightCharts.createChart(document.getElementById("candle"),{
     layout:{background:{color:bg},textColor:tx},
     rightPriceScale:{autoScale:true},
     timeScale:{timeVisible:true,borderVisible:false},
     grid:{horzLines:{color:grid},vertLines:{color:grid}},
     handleScroll:{mouseWheel:true,pressedMouseMove:true},
     handleScale:{axisPressedMouseMove:true,pinch:true},
-    autoSize:true,
+    autoSize:true
   });
-  candleSeries=candleChart.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',borderUpColor:'#26a69a',borderDownColor:'#ef5350',wickUpColor:'#26a69a',wickDownColor:'#ef5350'});
 
-  volChart=LightweightCharts.createChart(document.getElementById('volume'),{
+  candleSeries = candleChart.addCandlestickSeries({
+    upColor:"#26a69a",
+    downColor:"#ef5350",
+    borderUpColor:"#26a69a",
+    borderDownColor:"#ef5350",
+    wickUpColor:"#26a69a",
+    wickDownColor:"#ef5350"
+  });
+
+  const candles = rows.map(r => ({
+    time:  r.trade_date,
+    open:  +r.open,
+    high:  +r.high,
+    low:   +r.low,
+    close: +r.close
+  }));
+  candleSeries.setData(candles);
+
+  ma5Series = candleChart.addLineSeries({color:"#5b9bff",lineWidth:2,priceLineVisible:false});
+  ma5Series.setData(movingAverage(rows,5));
+  ma25Series = candleChart.addLineSeries({color:"#c084fc",lineWidth:2,priceLineVisible:false});
+  ma25Series.setData(movingAverage(rows,25));
+
+  candleChart.priceScale("right").applyOptions({
+    mode: priceMode === "pct"
+      ? LightweightCharts.PriceScaleMode.Percentage
+      : LightweightCharts.PriceScaleMode.Normal,
+    autoScale:true
+  });
+
+  // 出来高チャート
+  volChart = LightweightCharts.createChart(document.getElementById("volume"),{
     layout:{background:{color:bg},textColor:tx},
     rightPriceScale:{autoScale:true},
     timeScale:{visible:true},
@@ -153,64 +443,83 @@ function draw(rows){
     handleScale:{axisPressedMouseMove:true,pinch:true},
     autoSize:true
   });
-  volSeries=volChart.addHistogramSeries({color:getComputedStyle(document.documentElement).getPropertyValue('--vol').trim(),priceFormat:{type:'volume'}});
 
-  const candles=rows.map(r=>({time:r.trade_date, open:+r.open, high:+r.high, low:+r.low, close:+r.close}));
-  const vols   =rows.map(r=>({time:r.trade_date, value:+(r.volume||0)}));
-
-  candleSeries.setData(candles);
-  volSeries.setData(vols);
-
-  ma5Series=candleChart.addLineSeries({color:'#5b9bff',lineWidth:2,priceLineVisible:false}); ma5Series.setData(movingAverage(rows,5));
-  ma25Series=candleChart.addLineSeries({color:'#c084fc',lineWidth:2,priceLineVisible:false}); ma25Series.setData(movingAverage(rows,25));
-
-  candleChart.priceScale('right').applyOptions({
-    mode: priceMode==='pct' ? LightweightCharts.PriceScaleMode.Percentage
-                            : LightweightCharts.PriceScaleMode.Normal,
-    autoScale:true
+  volSeries = volChart.addHistogramSeries({
+    color:getComputedStyle(document.documentElement).getPropertyValue("--vol").trim(),
+    priceFormat:{type:"volume"}
   });
 
-  // 横幅いっぱい（両チャート同じ論理レンジ）
-  const N=rows.length; const logical={from:0, to:Math.max(1, N-1)};
+  const vols = rows.map(r => ({
+    time:  r.trade_date,
+    value: +(r.volume || 0)
+  }));
+  volSeries.setData(vols);
+
+  const N = rows.length;
+  const logical = {from:0,to:Math.max(1,N-1)};
   candleChart.timeScale().setVisibleLogicalRange(logical);
   volChart.timeScale().setVisibleLogicalRange(logical);
 
-  // 完全同期（timeRange & logicalRange）
-  let syncing=false;
+  let syncing = false;
   function bind(a,b){
-    a.timeScale().subscribeVisibleTimeRangeChange(r=>{ if(syncing||!r) return; syncing=true; b.timeScale().setVisibleRange(r); syncing=false; });
-    a.timeScale().subscribeVisibleLogicalRangeChange(r=>{ if(syncing||!r) return; syncing=true; b.timeScale().setVisibleLogicalRange(r); syncing=false; });
+    a.timeScale().subscribeVisibleTimeRangeChange(r=>{
+      if(syncing || !r) return;
+      syncing = true;
+      b.timeScale().setVisibleRange(r);
+      syncing = false;
+    });
+    a.timeScale().subscribeVisibleLogicalRangeChange(r=>{
+      if(syncing || !r) return;
+      syncing = true;
+      b.timeScale().setVisibleLogicalRange(r);
+      syncing = false;
+    });
   }
-  bind(candleChart, volChart); bind(volChart, candleChart);
+  bind(candleChart,volChart);
+  bind(volChart,candleChart);
 }
 
 /* ===== 起動 & UI ===== */
-let currentRows=[];
 (async function init(){
-  // 期間セレクト初期値反映
-  const sel=document.getElementById('period');
-  if([...sel.options].some(o=>+o.value===days)) sel.value=String(days);
+  const sel = document.getElementById("period");
+  if([].some.call(sel.options,o => +o.value === days)){
+    sel.value = String(days);
+  }
 
-  currentRows = await getRows(days);
-  draw(currentRows);
+  try{
+    currentRows = await getRows(days);
+    draw(currentRows);
+  }catch(e){
+    console.error("init error", e);
+  }
 
-  // 期間変更：再取得→再描画
-  sel.onchange = async (e)=>{
-    days=+e.target.value;
-    const u=new URL(location.href); u.searchParams.set('days',days); history.replaceState(null,'',u);
+  sel.onchange = async function(e){
+    days = +e.target.value;
+    const u = new URL(location.href);
+    u.searchParams.set("days",days);
+    history.replaceState(null,"",u);
     currentRows = await getRows(days);
     draw(currentRows);
   };
 
-  // ％切替：データを消さずに再描画
-  const percBtn=document.getElementById('toggle-perc');
-  const setPercUI=()=>percBtn.classList.toggle('active', priceMode==='pct');
-  percBtn.onclick=()=>{ priceMode=(priceMode==='pct'?'abs':'pct'); setPercUI(); draw(currentRows); };
+  const percBtn = document.getElementById("toggle-perc");
+  function setPercUI(){
+    if(priceMode === "pct") percBtn.classList.add("active");
+    else percBtn.classList.remove("active");
+  }
+  percBtn.onclick = function(){
+    priceMode = (priceMode === "pct" ? "abs" : "pct");
+    setPercUI();
+    draw(currentRows);
+  };
   setPercUI();
 
-  // テーマ切替：データは維持
-  const themeBtn=document.getElementById('toggle-theme');
-  themeBtn.onclick=()=>{ document.body.classList.toggle('light'); themeBtn.textContent = document.body.classList.contains('light') ? '☀️' : '🌙'; draw(currentRows); };
+  const themeBtn = document.getElementById("toggle-theme");
+  themeBtn.onclick = function(){
+    document.body.classList.toggle("light");
+    themeBtn.textContent = document.body.classList.contains("light") ? "☀️" : "🌙";
+    draw(currentRows);
+  };
 })();
 </script>
 </body>
