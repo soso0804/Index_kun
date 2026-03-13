@@ -1,504 +1,1016 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>チャート</title>
-<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
-<style>
-:root{
-  --bg:#0b0e11;
-  --card:#11151a;
-  --text:#e8eef5;
-  --muted:#9fb3c8;
-  --grid:#1b222b;
-  --up:#26a69a;
-  --down:#ef5350;
-  --accent:#5b9bff;
-  --vol:#f6c945;
-}
-body.light{
-  --bg:#f7f9fb;
-  --card:#ffffff;
-  --text:#18212f;
-  --muted:#55697e;
-  --grid:#e9eef5;
-}
-*{ box-sizing:border-box; }
-body{
-  margin:0;
-  background:var(--bg);
-  color:var(--text);
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Yu Gothic",sans-serif;
-  touch-action:manipulation;
-}
-.wrapper{
-  display:flex;
-  flex-direction:column;
-  height:100vh;
-  width:100%;
-}
-.header{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  justify-content:flex-end;
-  padding:8px 10px;
-  background:var(--card);
-  border-bottom:1px solid rgba(255,255,255,.08);
-}
-.header select,.header button{
-  background:transparent;
-  color:var(--text);
-  border:1px solid rgba(255,255,255,.2);
-  padding:6px 10px;
-  border-radius:8px;
-  font-size:14px;
-}
-.header button.active{
-  background:var(--accent);
-  color:#fff;
-  border-color:var(--accent);
-}
-.chart-area{
-  flex:1;
-  display:flex;
-  flex-direction:column;
-  padding:0 6px 2px 6px;
-}
-#candle{ flex:4; width:100%; }
-#volume{ flex:1.2; width:100%; }
-.footer{
-  background:var(--card);
-  border-top:1px solid rgba(255,255,255,.08);
-  padding:6px 10px;
-}
-.legend{
-  font-size:11px;
-  color:var(--muted);
-  display:flex;
-  gap:12px;
-  align-items:center;
-  flex-wrap:wrap;
-  justify-content:center;
-}
-.dot{
-  width:8px;
-  height:8px;
-  border-radius:50%;
-  display:inline-block;
-  margin-right:6px;
-}
-.tooltip{
-  position:absolute;
-  pointer-events:none;
-  background:rgba(0,0,0,.7);
-  color:#fff;
-  font-size:11px;
-  padding:6px 8px;
-  border-radius:6px;
-  white-space:nowrap;
-  z-index:10;
-  transform:translate(-50%,-120%);
-}
-.hidden{ display:none; }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>仮想株価チャート（現実指数連動版）</title>
+  <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    :root{
+      --bg:#f7f9fb;
+      --card:#ffffff;
+      --text:#18212f;
+      --muted:#5d7288;
+      --grid:#e7edf5;
+      --border:#dbe5f0;
+      --accent:#4c8bf5;
+      --up:#16a085;
+      --down:#e74c3c;
+      --vol:#f6c945;
+      --chip:#eff4fb;
+    }
+    body.dark{
+      --bg:#0b0e11;
+      --card:#11151a;
+      --text:#e8eef5;
+      --muted:#9fb3c8;
+      --grid:#1b222b;
+      --border:#202833;
+      --accent:#5b9bff;
+      --up:#26a69a;
+      --down:#ef5350;
+      --vol:#f6c945;
+      --chip:#171d24;
+    }
+    *{ box-sizing:border-box; }
+    html,body{
+      margin:0;
+      height:100%;
+      background:var(--bg);
+      color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Yu Gothic",sans-serif;
+    }
+    .app{
+      min-height:100%;
+      display:flex;
+      flex-direction:column;
+    }
+    .toolbar{
+      position:sticky;
+      top:0;
+      z-index:20;
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:12px;
+      background:var(--card);
+      border-bottom:1px solid var(--border);
+    }
+    .toolbar-left,.toolbar-right{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .title{
+      font-size:14px;
+      font-weight:700;
+      padding:8px 10px;
+      border-radius:10px;
+      background:var(--chip);
+    }
+    select,button{
+      appearance:none;
+      border:1px solid var(--border);
+      background:var(--card);
+      color:var(--text);
+      border-radius:10px;
+      padding:8px 12px;
+      font-size:14px;
+      cursor:pointer;
+    }
+    button.active{
+      background:var(--accent);
+      color:#fff;
+      border-color:var(--accent);
+    }
+    .range-group{
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+    }
+    .range-btn{ min-width:58px; }
+    .content{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      padding:10px;
+    }
+    .panel{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .panel-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      border-bottom:1px solid var(--border);
+    }
+    .panel-title{
+      font-weight:700;
+      font-size:14px;
+    }
+    .panel-sub{
+      color:var(--muted);
+      font-size:12px;
+    }
+    .stats{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      padding:10px 12px 0;
+    }
+    .stat{
+      background:var(--chip);
+      border-radius:10px;
+      padding:8px 10px;
+      min-width:96px;
+    }
+    .stat .k{
+      color:var(--muted);
+      font-size:11px;
+      margin-bottom:2px;
+    }
+    .stat .v{
+      font-size:14px;
+      font-weight:700;
+    }
+    #chart-wrap{
+      position:relative;
+      display:flex;
+      flex-direction:column;
+      height:calc(100vh - 230px);
+      min-height:420px;
+      padding:6px 6px 2px 6px;
+    }
+    #price-chart{ flex:4; min-height:0; }
+    #volume-chart{ flex:1.2; min-height:0; }
+    .footer-note{
+      padding:10px 12px 12px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.5;
+    }
+    .tooltip{
+      position:absolute;
+      pointer-events:none;
+      z-index:30;
+      min-width:180px;
+      max-width:280px;
+      padding:8px 10px;
+      border-radius:10px;
+      font-size:12px;
+      color:#fff;
+      background:rgba(17,21,26,.92);
+      box-shadow:0 8px 24px rgba(0,0,0,.22);
+      transform:translate(-50%,-110%);
+      display:none;
+      white-space:normal;
+    }
+    body.dark .tooltip{
+      background:rgba(6,8,10,.92);
+    }
+    .legend{
+      display:flex;
+      gap:14px;
+      flex-wrap:wrap;
+      align-items:center;
+      padding:0 12px 10px;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .dot{
+      width:8px;
+      height:8px;
+      display:inline-block;
+      border-radius:50%;
+      margin-right:5px;
+      vertical-align:middle;
+    }
+    @media (max-width:720px){
+      #chart-wrap{ height:calc(100vh - 280px); }
+      .panel-head{
+        flex-direction:column;
+        align-items:flex-start;
+      }
+    }
+  </style>
 </head>
-<body class="light">
-<div class="wrapper">
-  <div class="header">
-    <select id="period">
-      <option value="7">1週間</option>
-      <option value="30">1ヶ月</option>
-      <option value="180" selected>半年</option>
-      <option value="365">1年</option>
-    </select>
-    <button id="toggle-perc">％</button>
-    <button id="toggle-theme">☀️</button>
+<body>
+<div class="app">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <div class="title" id="company-title">銘柄</div>
+      <select id="company-select"></select>
+    </div>
+    <div class="toolbar-right">
+      <select id="market-source">
+        <option value="topix" selected>市場因子: TOPIX</option>
+        <option value="nikkei">市場因子: 日経平均</option>
+        <option value="none">市場因子なし</option>
+      </select>
+      <div class="range-group">
+        <button class="range-btn" data-range="7">1週</button>
+        <button class="range-btn" data-range="30">1ヶ月</button>
+        <button class="range-btn active" data-range="180">半年</button>
+        <button class="range-btn" data-range="365">1年</button>
+      </div>
+      <button id="toggle-mode">％</button>
+      <button id="toggle-theme">🌙</button>
+    </div>
   </div>
 
-  <div class="chart-area" id="chart-wrap">
-    <div id="candle"></div>
-    <div id="volume"></div>
-    <div class="tooltip hidden" id="tooltip"></div>
-  </div>
+  <div class="content">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title" id="panel-title">仮想株価</div>
+          <div class="panel-sub" id="panel-sub">現実指数を市場因子として反映した仮想系列</div>
+        </div>
+      </div>
 
-  <div class="footer">
-    <div class="legend">
-      <span><span class="dot" style="background:#5b9bff"></span>MA5</span>
-      <span><span class="dot" style="background:#c084fc"></span>MA25</span>
-      <span><span class="dot" style="background:#f6c945"></span>出来高</span>
+      <div class="stats">
+        <div class="stat"><div class="k">現在値</div><div class="v" id="stat-price">-</div></div>
+        <div class="stat"><div class="k">日次騰落</div><div class="v" id="stat-day">-</div></div>
+        <div class="stat"><div class="k">半年騰落</div><div class="v" id="stat-6m">-</div></div>
+        <div class="stat"><div class="k">1年騰落</div><div class="v" id="stat-1y">-</div></div>
+        <div class="stat"><div class="k">市場因子</div><div class="v" id="stat-factor">TOPIX</div></div>
+      </div>
+
+      <div id="chart-wrap">
+        <div id="price-chart"></div>
+        <div id="volume-chart"></div>
+        <div class="tooltip" id="tooltip"></div>
+      </div>
+
+      <div class="legend">
+        <span><span class="dot" style="background:#4c8bf5"></span>MA20</span>
+        <span><span class="dot" style="background:#b678ff"></span>MA60</span>
+        <span><span class="dot" style="background:#f6c945"></span>出来高</span>
+      </div>
+
+      <div class="footer-note">
+        市場因子には現実の指数の「日次騰落率」を使い、その上に業種共通因子・個別因子・ニュースジャンプ・市場ショックを重ねています。
+        APIが使えない場合は内部の代替因子へフォールバックします。
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-/* ===== Supabase設定 ===== */
-const SUPABASE_URL = "https://ddtszhkycoqnffgciucl.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdHN6aGt5Y29xbmZmZ2NpdWNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMDExODQsImV4cCI6MjA2NDU3NzE4NH0.hASl_SDEf86hISajh9WQ0o5kVTuWZCV7IJ7y363cN9c";
+(() => {
+  const q = new URLSearchParams(location.search);
 
-/* ===== URLパラメータ ===== */
-const q = new URLSearchParams(location.search);
-const COMPANY = q.get("company") || "KATOJI";
-const SRC = (q.get("src") || "fixed").toLowerCase();   // fixed | live
-let days = Number(q.get("days") || 180);
+  // ========= 設定 =========
+  // 本番ではここを自前APIにする。
+  // 返却形式例:
+  // [{ "date":"2024-01-04", "close":2378.79 }, ...]
+  //
+  // 例:
+  // /api/market-factor?index=topix
+  // /api/market-factor?index=nikkei
+  //
+  // バックエンド側は J-Quants / Twelve Data 等から取得して、
+  // フロントには date, close のみ返す。
+  const BACKEND_ENDPOINT = "/api/market-factor";
 
-/* ===== ユーティリティ（JST / ローカル日付で扱う） ===== */
-function toLocalDateString(d){
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,"0");
-  const day = String(d.getDate()).padStart(2,"0");
-  return `${y}-${m}-${day}`;
-}
-function since(d){
-  const s = new Date();
-  s.setDate(s.getDate() - d);
-  return toLocalDateString(s);
-}
-function todayISO(){
-  return toLocalDateString(new Date());
-}
-async function fetchJSON(path){
-  const r = await fetch(SUPABASE_URL + path, {
-    headers:{
-      apikey: SUPABASE_KEY,
-      Authorization: "Bearer " + SUPABASE_KEY
-    }
-  });
-  if(!r.ok){
-    throw new Error(await r.text());
-  }
-  return r.json();
-}
-function hashSeed(str){
-  let h = 2166136261;
-  for(let i=0;i<str.length;i++){
-    h ^= str.charCodeAt(i);
-    h += (h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);
-  }
-  return Math.abs(h % 100000);
-}
-function prng(seed){
-  return function(){
-    seed = Math.sin(seed) * 10000;
-    return seed - Math.floor(seed);
+  const PRESET_COMPANIES = [
+    { code:"KATOJI",    label:"KATOJI",    group:"consumer" },
+    { code:"SOFTNEXT",  label:"SOFTNEXT",  group:"tech" },
+    { code:"MIRAIBIO",  label:"MIRAIBIO",  group:"health" },
+    { code:"SEKAIRET",  label:"SEKAIRET",  group:"consumer" },
+    { code:"ALPHACHIP", label:"ALPHACHIP", group:"tech" },
+    { code:"AEROFLOW",  label:"AEROFLOW",  group:"industrial" }
+  ];
+
+  const GROUP_STYLE = {
+    tech:       { drift: 0.00055, baseVol: 0.024, meanRevert: 0.032, marketBetaBase: 1.10 },
+    consumer:   { drift: 0.00028, baseVol: 0.016, meanRevert: 0.040, marketBetaBase: 0.85 },
+    health:     { drift: 0.00035, baseVol: 0.022, meanRevert: 0.028, marketBetaBase: 0.95 },
+    industrial: { drift: 0.00022, baseVol: 0.018, meanRevert: 0.045, marketBetaBase: 1.00 }
   };
-}
-function stdev(a){
-  if(a.length < 2) return 0.02;
-  const m = a.reduce((x,y)=>x+y,0) / a.length;
-  const v = a.reduce((x,y)=>x + (y-m)*(y-m),0) / (a.length-1);
-  return Math.sqrt(v);
-}
 
-/* SB実データの水準・ボラに似せたモックを days 分作成（ローソク幅をやや小さめに調整） */
-function makeMockLikeSB(days, sbRows, seed){
-  const closes = sbRows.map(r => +r.close);
-  const vols   = sbRows.map(r => +(r.volume || 0));
-  const rets = [];
-  for(let i=1;i<closes.length;i++){
-    rets.push((closes[i]-closes[i-1]) / Math.max(1e-9, closes[i-1]));
-  }
-  const sigma = Math.max(0.01, Math.min(0.15, stdev(rets) || 0.03));
-  let px  = closes.length ? closes[closes.length-1] : 10000;
-  let vol = vols.length
-    ? vols.slice(-Math.min(vols.length,10)).reduce((a,b)=>a+b,0) / Math.min(vols.length,10)
-    : 20000;
+  const DAYS_TOTAL = 900;
+  let visibleDays = Number(q.get("days") || 180);
+  let marketSource = q.get("market") || "topix";
+  let priceMode = "abs";
+  let chartPrice, chartVol, seriesCandle, seriesVol, seriesMa20, seriesMa60;
+  let currentCompany = q.get("company") || "KATOJI";
+  let currentData = null;
+  let globalPack = null;
 
-  const rnd  = prng(seed);
-  const base = new Date();
-  base.setDate(base.getDate() - days);
-  const out = [];
+  function $(id){ return document.getElementById(id); }
 
-  for(let i=0;i<days;i++){
-    const d = new Date(base);
-    d.setDate(base.getDate() + i + 1);
-    const day = toLocalDateString(d);   // ローカル日付
-
-    const u = Math.max(1e-6, rnd());
-    const v = Math.max(1e-6, rnd());
-    const z = Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
-
-    const ret   = z * sigma * 0.45;      // 変動を少し小さめに
-    const open  = px;
-    const close = Math.max(50, open*(1+ret));
-
-    // ヒゲの幅も控えめに
-    const rangeBase  = Math.max(open*0.002, Math.abs(ret)*open*1.2);
-    const intraNoise = 150 + 350*rnd();
-    const range = rangeBase + intraNoise;
-
-    const high = Math.max(open, close) + range*0.25*rnd();
-    const low  = Math.min(open, close)  - range*0.25*rnd();
-
-    px  = close;
-    vol = Math.max(1000, vol*(0.9 + 0.2*rnd()));
-
-    out.push({
-      trade_date: day,
-      open:  +open.toFixed(2),
-      high:  +high.toFixed(2),
-      low:   +low.toFixed(2),
-      close: +close.toFixed(2),
-      volume: Math.round(vol)
-    });
-  }
-  return out;
-}
-
-/* 1. 過去分（〜前日まで）の OHLCV を取得して、足りない日はモックで補完 */
-async function getOhlcvRows(days){
-  const sinceStr = since(days);
-  const table = SRC === "live" ? "company_daily_ohlcv_live" : "company_daily_ohlcv";
-
-  let sb = [];
-  try{
-    sb = await fetchJSON(
-      `/rest/v1/${table}?company_name=eq.${encodeURIComponent(COMPANY)}` +
-      `&trade_date=gte.${sinceStr}` +
-      `&select=trade_date,open,high,low,close,volume&order=trade_date.asc`
-    );
-  }catch(e){
-    console.error("ohlcv fetch error", e);
+  function mulberry32(a){
+    return function(){
+      let t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
   }
 
-  // すでに当日分が ohlcv に入っている場合は、そのまま使う（volume も保持）
-  const today = todayISO();
-  const hasTodayOhlcv = sb.some(r => r.trade_date === today);
-
-  // 期間分の連続した日付（最後は「hasTodayOhlcv なら今日、そうでなければ昨日」）
-  const dayList = [];
-  const end = new Date();
-  if(!hasTodayOhlcv){
-    // 当日の OHLVC が無い場合は、ろうそく足は昨日まで（今日の点は別シリーズで描画）
-    end.setDate(end.getDate() - 1);
-  }
-  const start = new Date(end);
-  start.setDate(start.getDate() - days + 1);
-
-  for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
-    dayList.push(toLocalDateString(d));
+  function hashSeed(str){
+    let h = 2166136261 >>> 0;
+    for(let i=0;i<str.length;i++){
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
   }
 
-  const seed = hashSeed(COMPANY);
-  const mock = makeMockLikeSB(dayList.length, sb, seed);
-  const map  = new Map(sb.map(r => [r.trade_date, r]));
-
-  const merged = dayList.map(d => {
-    return map.get(d) || mock.find(m => m.trade_date === d);
-  });
-
-  return merged.filter(Boolean);
-}
-
-/* 2. 当日の株価（終値の点）を取得
-      - company_daily_price に当日分があれば { time, value } を返す
-      - 無ければ null
-*/
-async function getTodayPricePoint(ohlcvRows){
-  const today = todayISO();
-  const lastOhlcvDate = ohlcvRows.length ? ohlcvRows[ohlcvRows.length-1].trade_date : null;
-
-  // 既に OHLCV に今日が含まれているなら、点を追加する必要なし
-  if(lastOhlcvDate === today){
-    return null;
+  function randn(rng){
+    let u = 0, v = 0;
+    while(u === 0) u = rng();
+    while(v === 0) v = rng();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
   }
 
-  try{
-    const pr = await fetchJSON(
-      `/rest/v1/company_daily_price?company_name=eq.${encodeURIComponent(COMPANY)}` +
-      `&trade_date=eq.${today}` +
-      `&select=trade_date,current_price&limit=1`
-    );
-    if(pr && pr.length){
-      const p = pr[0];
-      const price = Number(p.current_price);
-      if(!isNaN(price)){
-        return { time: p.trade_date, value: price };
+  function clamp(x, lo, hi){
+    return Math.max(lo, Math.min(hi, x));
+  }
+
+  function addDays(d, n){
+    const x = new Date(d);
+    x.setDate(x.getDate() + n);
+    return x;
+  }
+
+  function fmtDate(d){
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${day}`;
+  }
+
+  function movingAverage(rows, n){
+    const out = [];
+    let sum = 0;
+    const buf = [];
+    for(const r of rows){
+      const c = r.close;
+      buf.push(c);
+      sum += c;
+      if(buf.length > n) sum -= buf.shift();
+      out.push({
+        time: r.time,
+        value: buf.length === n ? +(sum / n).toFixed(2) : NaN
+      });
+    }
+    return out;
+  }
+
+  function nearestIndex(rows, targetTime){
+    let lo = 0, hi = rows.length - 1;
+    while(lo < hi){
+      const mid = (lo + hi) >> 1;
+      if(rows[mid].time < targetTime) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  }
+
+  function createBusinessDays(total){
+    const out = [];
+    let d = addDays(new Date(), -(Math.ceil(total * 1.55)));
+    while(out.length < total){
+      const day = d.getDay();
+      if(day !== 0 && day !== 6){
+        out.push(new Date(d));
+      }
+      d = addDays(d, 1);
+    }
+    return out;
+  }
+
+  function companyFromCode(code){
+    const found = PRESET_COMPANIES.find(x => x.code === code);
+    if(found) return found;
+    const groups = ["tech","consumer","health","industrial"];
+    const g = groups[hashSeed(code) % groups.length];
+    return { code, label:code, group:g };
+  }
+
+  function buildDateMap(dates){
+    const map = new Map();
+    dates.forEach((d, i) => map.set(fmtDate(d), i));
+    return map;
+  }
+
+  function normalizeReturnSeries(rawReturns, targetLen){
+    if(!Array.isArray(rawReturns) || rawReturns.length === 0){
+      return new Array(targetLen).fill(0);
+    }
+
+    const arr = rawReturns.slice(-targetLen);
+    if(arr.length < targetLen){
+      const pad = new Array(targetLen - arr.length).fill(0);
+      return pad.concat(arr);
+    }
+    return arr;
+  }
+
+  function computeReturnsFromCloses(series, targetDates){
+    const idxMap = buildDateMap(targetDates);
+    const closeMap = new Map();
+
+    for(const row of series){
+      if(row && row.date && Number.isFinite(Number(row.close))){
+        closeMap.set(row.date, Number(row.close));
       }
     }
-  }catch(e){
-    console.error("price fetch error", e);
+
+    const target = targetDates.map(d => {
+      const key = fmtDate(d);
+      return { date:key, close: closeMap.get(key) ?? null };
+    });
+
+    // 穴埋め: 直近値で forward fill
+    let lastClose = null;
+    for(const row of target){
+      if(row.close == null){
+        row.close = lastClose;
+      }else{
+        lastClose = row.close;
+      }
+    }
+    // 先頭側の null を後ろから埋める
+    let firstValid = target.find(r => r.close != null)?.close ?? 1000;
+    for(const row of target){
+      if(row.close == null) row.close = firstValid;
+    }
+
+    const returns = [];
+    for(let i=0;i<target.length;i++){
+      if(i === 0){
+        returns.push(0);
+      }else{
+        const prev = target[i-1].close;
+        const cur = target[i].close;
+        returns.push(prev > 0 ? (cur / prev - 1) : 0);
+      }
+    }
+    return returns.map(x => clamp(x, -0.12, 0.12));
   }
-  return null;
-}
 
-/* ===== 描画 ===== */
-let priceMode = "abs";
-let candleChart, volChart, candleSeries, volSeries, ma5Series, ma25Series, todaySeries;
-let currentRows = [];
-let currentTodayPoint = null;
+  function makeFallbackMarketReturns(dates, seed = 20260313){
+    const rng = mulberry32(seed);
+    const arr = [];
+    let regime = 0;
+    for(let i=0;i<dates.length;i++){
+      regime = 0.985 * regime + randn(rng) * 0.0028;
+      let r = regime + randn(rng) * 0.0065;
+      if(rng() < 0.011){
+        r += -(0.04 + rng() * 0.08);
+      }
+      arr.push(clamp(r, -0.12, 0.10));
+    }
+    return arr;
+  }
 
-function movingAverage(rows,n){
-  const out = [];
-  let sum = 0;
-  const buf = [];
-  for(const r of rows){
-    const c = +r.close;
-    buf.push(c);
-    sum += c;
-    if(buf.length > n) sum -= buf.shift();
-    out.push({
-      time: r.trade_date,
-      value: buf.length === n ? +(sum/n).toFixed(2) : NaN
+  async function fetchExternalMarketReturns(indexName, dates){
+    if(indexName === "none"){
+      return new Array(dates.length).fill(0);
+    }
+
+    try{
+      const url = `${BACKEND_ENDPOINT}?index=${encodeURIComponent(indexName)}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if(!res.ok) throw new Error(`market fetch failed: ${res.status}`);
+      const json = await res.json();
+
+      // 期待形式: [{date:"YYYY-MM-DD", close:1234.56}, ...]
+      return computeReturnsFromCloses(json, dates);
+    }catch(err){
+      console.warn("external market factor failed, fallback used", err);
+      return makeFallbackMarketReturns(dates, hashSeed(indexName + "::fallback"));
+    }
+  }
+
+  function generateWorldFromExternalMarket(dates, externalMarketReturns){
+    const rng = mulberry32(20260313);
+    const market = normalizeReturnSeries(externalMarketReturns, dates.length);
+    const groups = {
+      tech: new Array(dates.length).fill(0),
+      consumer: new Array(dates.length).fill(0),
+      health: new Array(dates.length).fill(0),
+      industrial: new Array(dates.length).fill(0),
+    };
+    const shocks = new Array(dates.length).fill(0);
+    const shockMeta = {};
+
+    const gRegime = { tech:0, consumer:0, health:0, industrial:0 };
+
+    for(let i=0;i<dates.length;i++){
+      for(const g of Object.keys(groups)){
+        gRegime[g] = 0.97 * gRegime[g] + randn(rng) * 0.0035;
+
+        // 現実市場因子と、業種ごとの共通揺れを混ぜる
+        const marketLeak =
+          g === "tech" ? market[i] * 0.38 :
+          g === "industrial" ? market[i] * 0.30 :
+          g === "consumer" ? market[i] * 0.22 :
+          market[i] * 0.18;
+
+        groups[g][i] = gRegime[g] + randn(rng) * 0.004 + marketLeak;
+      }
+
+      // 市場ショック
+      if(market[i] < -0.03 || rng() < 0.006){
+        const shock = market[i] < -0.03
+          ? clamp(market[i] * (0.8 + rng() * 0.5), -0.16, -0.03)
+          : -(0.04 + rng() * 0.08);
+        shocks[i] += shock;
+        shockMeta[i] = shock;
+      }
+    }
+
+    return { market, groups, shocks, shockMeta };
+  }
+
+  function generateCompanySeries(company, dates, world){
+    const seed = hashSeed(company.code + "::virtual");
+    const rng = mulberry32(seed);
+    const style = GROUP_STYLE[company.group] || GROUP_STYLE.consumer;
+    const rows = [];
+
+    const betaMarket = style.marketBetaBase * (0.8 + rng() * 0.5);
+    const betaGroup  = 0.55 + rng() * 0.90;
+    const idioVol    = style.baseVol * (0.65 + rng() * 0.9);
+    const driftAdj   = style.drift + (rng() - 0.5) * 0.00028;
+    const meanLevel  = 0.9 + rng() * 0.25;
+    const jumpBias   = (rng() - 0.5) * 0.0012;
+    const gapiness   = 0.15 + rng() * 0.55;
+
+    let price = 700 + (hashSeed(company.code) % 9000);
+    let volumeBase = 90000 + (hashSeed(company.code + "vol") % 220000);
+
+    let mispricing = 0;
+    let trendState = 0;
+    let newsImpact = 0;
+    let volMemory = 1;
+    const newsMap = {};
+
+    for(let i=0;i<dates.length;i++){
+      const market = world.market[i];
+      const group = world.groups[company.group][i];
+      const shock = world.shocks[i];
+
+      trendState = 0.92 * trendState + randn(rng) * 0.0025;
+      const fair = meanLevel * (1000 + (hashSeed(company.code) % 6000));
+      mispricing = Math.log(Math.max(1, price) / fair);
+
+      // 個別ニュース
+      if(rng() < 0.022){
+        const sign = rng() < 0.56 ? 1 : -1;
+        const amp = sign * (0.018 + rng() * 0.085);
+        newsImpact += amp;
+        newsMap[i] = amp;
+      }
+      newsImpact *= 0.78;
+
+      const shockLoading = shock !== 0 ? (0.75 + rng() * 0.6) : 0;
+
+      const ret =
+          driftAdj
+        + betaMarket * market
+        + betaGroup * group
+        + trendState
+        - style.meanRevert * mispricing
+        + jumpBias
+        + newsImpact
+        + shockLoading * shock
+        + randn(rng) * idioVol * volMemory;
+
+      const cappedRet = clamp(ret, -0.22, 0.22);
+
+      const open = price;
+      const gap = randn(rng) * idioVol * 0.28 * gapiness + (newsMap[i] || 0) * 0.45 + shock * 0.25;
+      const gapOpen = Math.max(40, open * (1 + clamp(gap, -0.08, 0.08)));
+      const close = Math.max(40, gapOpen * (1 + cappedRet));
+
+      const wickBase = Math.abs(cappedRet) * 0.55
+        + idioVol * (0.55 + rng() * 1.1)
+        + Math.abs(newsImpact) * 0.35
+        + Math.abs(shock) * 0.45;
+
+      const upperW = clamp(wickBase * (0.35 + rng()), 0.002, 0.18);
+      const lowerW = clamp(wickBase * (0.35 + rng()), 0.002, 0.18);
+
+      const high = Math.max(gapOpen, close) * (1 + upperW);
+      const low  = Math.min(gapOpen, close) * (1 - lowerW);
+
+      volMemory = 0.82 * volMemory + 0.18 * (1 + Math.abs(cappedRet) * 14 + Math.abs(newsImpact) * 18 + Math.abs(shock) * 20);
+      volumeBase *= (0.995 + rng() * 0.012);
+      const volume = Math.round(Math.max(5000, volumeBase * volMemory * (0.85 + rng() * 0.45)));
+
+      rows.push({
+        time: fmtDate(dates[i]),
+        open: +gapOpen.toFixed(2),
+        high: +high.toFixed(2),
+        low: +Math.max(1, low).toFixed(2),
+        close: +close.toFixed(2),
+        volume,
+        news: newsMap[i] || 0,
+        shock: world.shockMeta[i] || 0,
+        marketReturn: market
+      });
+
+      price = close;
+    }
+
+    return rows;
+  }
+
+  async function buildWorldAndAllCompanies(indexName){
+    const dates = createBusinessDays(DAYS_TOTAL);
+    const externalReturns = await fetchExternalMarketReturns(indexName, dates);
+    const world = generateWorldFromExternalMarket(dates, externalReturns);
+
+    const pack = {
+      dates,
+      companies: {},
+      marketSource: indexName,
+      externalReturns
+    };
+
+    const codes = [...new Set([...PRESET_COMPANIES.map(x => x.code), currentCompany])];
+    for(const code of codes){
+      const info = companyFromCode(code);
+      pack.companies[code] = {
+        info,
+        rows: generateCompanySeries(info, dates, world)
+      };
+    }
+    return pack;
+  }
+
+  function initCompanyOptions(){
+    const sel = $("company-select");
+    const codes = [...new Set([...PRESET_COMPANIES.map(x => x.code), currentCompany])];
+    sel.innerHTML = "";
+    for(const code of codes){
+      const info = companyFromCode(code);
+      const opt = document.createElement("option");
+      opt.value = info.code;
+      opt.textContent = `${info.label} / ${info.group}`;
+      if(info.code === currentCompany) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  }
+
+  function destroyCharts(){
+    if(chartPrice){ chartPrice.remove(); chartPrice = null; }
+    if(chartVol){ chartVol.remove(); chartVol = null; }
+  }
+
+  function createCharts(){
+    destroyCharts();
+
+    const cs = getComputedStyle(document.body);
+    const bg = cs.getPropertyValue("--bg").trim();
+    const text = cs.getPropertyValue("--text").trim();
+    const grid = cs.getPropertyValue("--grid").trim();
+    const up = cs.getPropertyValue("--up").trim();
+    const down = cs.getPropertyValue("--down").trim();
+    const volColor = cs.getPropertyValue("--vol").trim();
+
+    chartPrice = LightweightCharts.createChart($("price-chart"), {
+      autoSize: true,
+      layout: {
+        background: { color: bg },
+        textColor: text
+      },
+      grid: {
+        vertLines: { color: grid },
+        horzLines: { color: grid }
+      },
+      rightPriceScale: {
+        borderVisible: false,
+        autoScale: true
+      },
+      timeScale: {
+        borderVisible: false,
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 6
+      },
+      crosshair: {
+        mode: LightweightCharts.CrosshairMode.Normal
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: true
+      },
+      handleScale: {
+        mouseWheel: true,
+        pinch: true,
+        axisPressedMouseMove: true
+      }
+    });
+
+    chartVol = LightweightCharts.createChart($("volume-chart"), {
+      autoSize: true,
+      layout: {
+        background: { color: bg },
+        textColor: text
+      },
+      grid: {
+        vertLines: { color: grid },
+        horzLines: { color: grid }
+      },
+      rightPriceScale: {
+        borderVisible: false,
+        autoScale: true
+      },
+      timeScale: {
+        borderVisible: false,
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 6
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: true
+      },
+      handleScale: {
+        mouseWheel: true,
+        pinch: true,
+        axisPressedMouseMove: true
+      }
+    });
+
+    seriesCandle = chartPrice.addCandlestickSeries({
+      upColor: up,
+      downColor: down,
+      borderUpColor: up,
+      borderDownColor: down,
+      wickUpColor: up,
+      wickDownColor: down
+    });
+
+    seriesMa20 = chartPrice.addLineSeries({
+      color: "#4c8bf5",
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false
+    });
+
+    seriesMa60 = chartPrice.addLineSeries({
+      color: "#b678ff",
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false
+    });
+
+    seriesVol = chartVol.addHistogramSeries({
+      color: volColor,
+      priceFormat: { type: "volume" },
+      priceScaleId: ""
+    });
+
+    chartVol.priceScale("").applyOptions({
+      scaleMargins: { top: 0.1, bottom: 0 }
+    });
+
+    let syncing = false;
+    function sync(from, to){
+      from.timeScale().subscribeVisibleLogicalRangeChange(range => {
+        if(syncing || !range) return;
+        syncing = true;
+        to.timeScale().setVisibleLogicalRange(range);
+        syncing = false;
+      });
+    }
+    sync(chartPrice, chartVol);
+    sync(chartVol, chartPrice);
+
+    bindTooltip();
+  }
+
+  function setSeriesData(rows){
+    seriesCandle.setData(rows.map(r => ({
+      time: r.time,
+      open: r.open,
+      high: r.high,
+      low: r.low,
+      close: r.close
+    })));
+
+    seriesVol.setData(rows.map(r => ({
+      time: r.time,
+      value: r.volume,
+      color: r.close >= r.open ? "rgba(22,160,133,0.65)" : "rgba(231,76,60,0.65)"
+    })));
+
+    seriesMa20.setData(movingAverage(rows, 20));
+    seriesMa60.setData(movingAverage(rows, 60));
+  }
+
+  function applyRange(days){
+    if(!currentData || !chartPrice) return;
+    const rows = currentData.rows;
+    const len = rows.length;
+    const fromIndex = Math.max(0, len - days);
+    const toIndex = len - 1;
+
+    chartPrice.timeScale().setVisibleLogicalRange({
+      from: fromIndex - 8,
+      to: toIndex + 6
+    });
+    chartVol.timeScale().setVisibleLogicalRange({
+      from: fromIndex - 8,
+      to: toIndex + 6
     });
   }
-  return out;
-}
 
-function draw(rows, todayPoint){
-  const wrap = document.getElementById("chart-wrap");
-  wrap.innerHTML = '<div id="candle"></div><div id="volume"></div><div class="tooltip hidden" id="tooltip"></div>';
+  function updateStats(rows){
+    const last = rows[rows.length - 1];
+    const prev = rows[rows.length - 2] || last;
 
-  const cs   = getComputedStyle(document.body);
-  const bg   = cs.getPropertyValue("--bg").trim();
-  const tx   = cs.getPropertyValue("--text").trim();
-  const grid = cs.getPropertyValue("--grid").trim();
+    const pNow = last.close;
+    const dayRet = ((last.close / prev.close) - 1) * 100;
 
-  // --- メインチャート ---
-  candleChart = LightweightCharts.createChart(document.getElementById("candle"),{
-    layout:{background:{color:bg},textColor:tx},
-    rightPriceScale:{autoScale:true},
-    timeScale:{timeVisible:true,borderVisible:false},
-    grid:{horzLines:{color:grid},vertLines:{color:grid}},
-    handleScroll:{mouseWheel:true,pressedMouseMove:true},
-    handleScale:{axisPressedMouseMove:true,pinch:true},
-    autoSize:true
-  });
+    const r6mBase = rows[Math.max(0, rows.length - 181)]?.close || rows[0].close;
+    const r1yBase = rows[Math.max(0, rows.length - 366)]?.close || rows[0].close;
+    const r6m = ((last.close / r6mBase) - 1) * 100;
+    const r1y = ((last.close / r1yBase) - 1) * 100;
 
-  candleSeries = candleChart.addCandlestickSeries({
-    upColor:"#26a69a",
-    downColor:"#ef5350",
-    borderUpColor:"#26a69a",
-    borderDownColor:"#ef5350",
-    wickUpColor:"#26a69a",
-    wickDownColor:"#ef5350"
-  });
-
-  const candles = rows.map(r => ({
-    time:  r.trade_date,
-    open:  +r.open,
-    high:  +r.high,
-    low:   +r.low,
-    close: +r.close
-  }));
-  candleSeries.setData(candles);
-
-  // MA
-  ma5Series = candleChart.addLineSeries({color:"#5b9bff",lineWidth:2,priceLineVisible:false});
-  ma5Series.setData(movingAverage(rows,5));
-  ma25Series = candleChart.addLineSeries({color:"#c084fc",lineWidth:2,priceLineVisible:false});
-  ma25Series.setData(movingAverage(rows,25));
-
-  // 当日の終値の点（company_daily_price）
-  if(todayPoint){
-    todaySeries = candleChart.addLineSeries({
-      color:"#ff9800",
-      lineWidth:2,
-      priceLineVisible:false,
-      lastValueVisible:false,
-      crosshairMarkerVisible:true,
-      crosshairMarkerRadius:3
-    });
-    todaySeries.setData([{ time: todayPoint.time, value: todayPoint.value }]);
+    $("stat-price").textContent = `${pNow.toLocaleString("ja-JP", {maximumFractionDigits:2})}`;
+    $("stat-day").textContent = `${dayRet >= 0 ? "+" : ""}${dayRet.toFixed(2)}%`;
+    $("stat-6m").textContent = `${r6m >= 0 ? "+" : ""}${r6m.toFixed(2)}%`;
+    $("stat-1y").textContent = `${r1y >= 0 ? "+" : ""}${r1y.toFixed(2)}%`;
+    $("stat-factor").textContent =
+      marketSource === "topix" ? "TOPIX" :
+      marketSource === "nikkei" ? "日経平均" : "なし";
   }
 
-  candleChart.priceScale("right").applyOptions({
-    mode: priceMode === "pct"
-      ? LightweightCharts.PriceScaleMode.Percentage
-      : LightweightCharts.PriceScaleMode.Normal,
-    autoScale:true
-  });
+  function setHeader(info){
+    $("company-title").textContent = `銘柄: ${info.label}`;
+    $("panel-title").textContent = `${info.label} の仮想株価`;
+    $("panel-sub").textContent =
+      `市場因子: ${marketSource === "topix" ? "TOPIX" : marketSource === "nikkei" ? "日経平均" : "なし"} / グループ: ${info.group}`;
+  }
 
-  // --- 出来高チャート ---
-  volChart = LightweightCharts.createChart(document.getElementById("volume"),{
-    layout:{background:{color:bg},textColor:tx},
-    rightPriceScale:{autoScale:true},
-    timeScale:{visible:true},
-    grid:{horzLines:{color:grid},vertLines:{color:grid}},
-    handleScroll:{mouseWheel:true,pressedMouseMove:true},
-    handleScale:{axisPressedMouseMove:true,pinch:true},
-    autoSize:true
-  });
-
-  volSeries = volChart.addHistogramSeries({
-    color:getComputedStyle(document.documentElement).getPropertyValue("--vol").trim(),
-    priceFormat:{type:"volume"}
-  });
-
-  const vols = rows.map(r => ({
-    time:  r.trade_date,
-    value: +(r.volume || 0)
-  }));
-  volSeries.setData(vols);
-
-  const N = rows.length;
-  const logical = {from:0,to:Math.max(1,N-1)};
-  candleChart.timeScale().setVisibleLogicalRange(logical);
-  volChart.timeScale().setVisibleLogicalRange(logical);
-
-  let syncing = false;
-  function bind(a,b){
-    a.timeScale().subscribeVisibleTimeRangeChange(r=>{
-      if(syncing || !r) return;
-      syncing = true;
-      b.timeScale().setVisibleRange(r);
-      syncing = false;
+  function applyPriceMode(){
+    if(!chartPrice) return;
+    chartPrice.priceScale("right").applyOptions({
+      mode: priceMode === "pct"
+        ? LightweightCharts.PriceScaleMode.Percentage
+        : LightweightCharts.PriceScaleMode.Normal,
+      autoScale: true
     });
-    a.timeScale().subscribeVisibleLogicalRangeChange(r=>{
-      if(syncing || !r) return;
-      syncing = true;
-      b.timeScale().setVisibleLogicalRange(r);
-      syncing = false;
+    $("toggle-mode").classList.toggle("active", priceMode === "pct");
+  }
+
+  function bindTooltip(){
+    const tooltip = $("tooltip");
+    const wrap = $("chart-wrap");
+
+    chartPrice.subscribeCrosshairMove(param => {
+      if(!param || !param.time || !param.point){
+        tooltip.style.display = "none";
+        return;
+      }
+
+      const rows = currentData.rows;
+      const time = param.time;
+      const idx = nearestIndex(rows, String(time));
+      const r = rows[idx];
+      if(!r){
+        tooltip.style.display = "none";
+        return;
+      }
+
+      const dayRet = idx > 0 ? ((r.close / rows[idx - 1].close) - 1) * 100 : 0;
+
+      let eventText = "";
+      if(r.shock){
+        eventText = `市場ショック ${(r.shock * 100).toFixed(1)}%`;
+      } else if(r.news){
+        eventText = `個別ニュース ${r.news > 0 ? "+" : ""}${(r.news * 100).toFixed(1)}%`;
+      }
+
+      tooltip.innerHTML = `
+        <div style="font-weight:700; margin-bottom:4px;">${r.time}</div>
+        <div>O ${r.open.toFixed(2)} / H ${r.high.toFixed(2)} / L ${r.low.toFixed(2)} / C ${r.close.toFixed(2)}</div>
+        <div>日次騰落 ${dayRet >= 0 ? "+" : ""}${dayRet.toFixed(2)}%</div>
+        <div>市場因子 ${(r.marketReturn * 100 >= 0 ? "+" : "")}${(r.marketReturn * 100).toFixed(2)}%</div>
+        <div>出来高 ${r.volume.toLocaleString("ja-JP")}</div>
+        ${eventText ? `<div style="margin-top:4px; color:#ffd76a;">${eventText}</div>` : ""}
+      `;
+      tooltip.style.display = "block";
+
+      const rect = wrap.getBoundingClientRect();
+      let left = param.point.x;
+      let top = param.point.y;
+      left = clamp(left, 120, rect.width - 120);
+      top = clamp(top, 70, rect.height - 30);
+
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
     });
   }
-  bind(candleChart,volChart);
-  bind(volChart,candleChart);
-}
 
-/* ===== 起動 & UI ===== */
-(async function init(){
-  const sel = document.getElementById("period");
-  if([].some.call(sel.options,o => +o.value === days)){
-    sel.value = String(days);
-  }
+  async function renderCompany(code){
+    currentCompany = code;
 
-  try{
-    currentRows = await getOhlcvRows(days);
-    currentTodayPoint = await getTodayPricePoint(currentRows);
-    draw(currentRows, currentTodayPoint);
-  }catch(e){
-    console.error("init error", e);
-  }
+    if(!globalPack.companies[code]){
+      const info = companyFromCode(code);
+      const world = generateWorldFromExternalMarket(globalPack.dates, globalPack.externalReturns);
+      globalPack.companies[code] = {
+        info,
+        rows: generateCompanySeries(info, globalPack.dates, world)
+      };
+    }
 
-  sel.onchange = async function(e){
-    days = +e.target.value;
+    currentData = globalPack.companies[code];
+    setHeader(currentData.info);
+
+    createCharts();
+    setSeriesData(currentData.rows);
+    updateStats(currentData.rows);
+    applyPriceMode();
+    applyRange(visibleDays);
+
     const u = new URL(location.href);
-    u.searchParams.set("days",days);
-    history.replaceState(null,"",u);
-    currentRows = await getOhlcvRows(days);
-    currentTodayPoint = await getTodayPricePoint(currentRows);
-    draw(currentRows, currentTodayPoint);
-  };
-
-  const percBtn = document.getElementById("toggle-perc");
-  function setPercUI(){
-    if(priceMode === "pct") percBtn.classList.add("active");
-    else percBtn.classList.remove("active");
+    u.searchParams.set("company", code);
+    u.searchParams.set("days", String(visibleDays));
+    u.searchParams.set("market", marketSource);
+    history.replaceState(null, "", u);
   }
-  percBtn.onclick = function(){
-    priceMode = (priceMode === "pct" ? "abs" : "pct");
-    setPercUI();
-    draw(currentRows, currentTodayPoint);
-  };
-  setPercUI();
 
-  const themeBtn = document.getElementById("toggle-theme");
-  themeBtn.onclick = function(){
-    document.body.classList.toggle("light");
-    themeBtn.textContent = document.body.classList.contains("light") ? "☀️" : "🌙";
-    draw(currentRows, currentTodayPoint);
-  };
+  async function rebuildAllWithMarket(indexName){
+    marketSource = indexName;
+    $("market-source").value = indexName;
+    globalPack = await buildWorldAndAllCompanies(indexName);
+    await renderCompany(currentCompany);
+  }
+
+  function bindUI(){
+    $("company-select").addEventListener("change", async e => {
+      await renderCompany(e.target.value);
+    });
+
+    $("market-source").addEventListener("change", async e => {
+      await rebuildAllWithMarket(e.target.value);
+    });
+
+    document.querySelectorAll(".range-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        visibleDays = Number(btn.dataset.range);
+        document.querySelectorAll(".range-btn").forEach(b => b.classList.toggle("active", b === btn));
+        applyRange(visibleDays);
+
+        const u = new URL(location.href);
+        u.searchParams.set("company", currentCompany);
+        u.searchParams.set("days", String(visibleDays));
+        u.searchParams.set("market", marketSource);
+        history.replaceState(null, "", u);
+      });
+    });
+
+    document.querySelectorAll(".range-btn").forEach(b => {
+      b.classList.toggle("active", Number(b.dataset.range) === visibleDays);
+    });
+
+    $("toggle-mode").addEventListener("click", () => {
+      priceMode = (priceMode === "abs") ? "pct" : "abs";
+      applyPriceMode();
+    });
+
+    $("toggle-theme").addEventListener("click", async () => {
+      document.body.classList.toggle("dark");
+      $("toggle-theme").textContent = document.body.classList.contains("dark") ? "☀️" : "🌙";
+      await renderCompany(currentCompany);
+    });
+
+    window.addEventListener("resize", () => {
+      if(chartPrice) chartPrice.applyOptions({});
+      if(chartVol) chartVol.applyOptions({});
+    });
+  }
+
+  async function init(){
+    $("market-source").value = marketSource;
+    initCompanyOptions();
+    bindUI();
+    globalPack = await buildWorldAndAllCompanies(marketSource);
+    await renderCompany(currentCompany);
+  }
+
+  init();
 })();
 </script>
 </body>
