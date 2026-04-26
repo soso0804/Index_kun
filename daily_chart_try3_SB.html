@@ -1,477 +1,546 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>チャート</title>
-<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
-<style>
-:root{
-  --bg:#0b0e11;
-  --card:#11151a;
-  --text:#e8eef5;
-  --muted:#9fb3c8;
-  --grid:#1b222b;
-  --up:#26a69a;
-  --down:#ef5350;
-  --accent:#5b9bff;
-  --vol:#f6c945;
-}
-body.light{
-  --bg:#f7f9fb;
-  --card:#ffffff;
-  --text:#18212f;
-  --muted:#55697e;
-  --grid:#e9eef5;
-}
-*{ box-sizing:border-box; }
-body{
-  margin:0;
-  background:var(--bg);
-  color:var(--text);
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Yu Gothic",sans-serif;
-  touch-action:manipulation;
-}
-.wrapper{
-  display:flex;
-  flex-direction:column;
-  height:100vh;
-  width:100%;
-}
-.header{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  justify-content:flex-end;
-  padding:8px 10px;
-  background:var(--card);
-  border-bottom:1px solid rgba(255,255,255,.08);
-}
-.header select,.header button{
-  background:transparent;
-  color:var(--text);
-  border:1px solid rgba(255,255,255,.2);
-  padding:6px 10px;
-  border-radius:8px;
-  font-size:14px;
-}
-.header button.active{
-  background:var(--accent);
-  color:#fff;
-  border-color:var(--accent);
-}
-.chart-area{
-  flex:1;
-  display:flex;
-  flex-direction:column;
-  padding:0 6px 2px 6px;
-}
-#candle{ flex:4; width:100%; }
-#volume{ flex:1.2; width:100%; }
-.footer{
-  background:var(--card);
-  border-top:1px solid rgba(255,255,255,.08);
-  padding:6px 10px;
-}
-.legend{
-  font-size:11px;
-  color:var(--muted);
-  display:flex;
-  gap:12px;
-  align-items:center;
-  flex-wrap:wrap;
-  justify-content:center;
-}
-.dot{
-  width:8px;
-  height:8px;
-  border-radius:50%;
-  display:inline-block;
-  margin-right:6px;
-}
-.tooltip{
-  position:absolute;
-  pointer-events:none;
-  background:rgba(0,0,0,.7);
-  color:#fff;
-  font-size:11px;
-  padding:6px 8px;
-  border-radius:6px;
-  white-space:nowrap;
-  z-index:10;
-  transform:translate(-50%,-120%);
-}
-.hidden{ display:none; }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>投資クン 仮想株価チャート</title>
+  <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    :root{
+      --bg:#f7f9fb; --card:#fff; --text:#18212f; --muted:#5d7288;
+      --grid:#e7edf5; --border:#dbe5f0; --accent:#4c8bf5;
+      --up:#16a085; --down:#e74c3c; --chip:#eff4fb;
+      --shadow:0 10px 30px rgba(24,33,47,.08);
+    }
+    body.dark{
+      --bg:#0b0e11; --card:#11151a; --text:#e8eef5; --muted:#9fb3c8;
+      --grid:#1b222b; --border:#202833; --accent:#5b9bff;
+      --up:#26a69a; --down:#ef5350; --chip:#171d24;
+      --shadow:0 10px 30px rgba(0,0,0,.32);
+    }
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; height:100%; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Yu Gothic",sans-serif; }
+    .app{ min-height:100%; display:flex; flex-direction:column; }
+    .toolbar{ position:sticky; top:0; z-index:20; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:12px; background:var(--card); border-bottom:1px solid var(--border); box-shadow:var(--shadow); }
+    .toolbar-left,.toolbar-right{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .title{ font-size:14px; font-weight:800; padding:8px 10px; border-radius:12px; background:var(--chip); }
+    select,button{ appearance:none; border:1px solid var(--border); background:var(--card); color:var(--text); border-radius:12px; padding:8px 12px; font-size:14px; cursor:pointer; }
+    select{ max-width:280px; }
+    button.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
+    .range-group{ display:flex; gap:6px; flex-wrap:wrap; }
+    .range-btn{ min-width:58px; }
+    .content{ flex:1; display:flex; flex-direction:column; gap:10px; padding:10px; }
+    .panel{ background:var(--card); border:1px solid var(--border); border-radius:18px; overflow:hidden; box-shadow:var(--shadow); }
+    .panel-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding:12px; border-bottom:1px solid var(--border); }
+    .panel-title{ font-weight:800; font-size:16px; margin-bottom:4px; }
+    .panel-sub{ color:var(--muted); font-size:12px; line-height:1.55; }
+    .industry-pill{ display:inline-flex; align-items:center; padding:7px 10px; background:var(--chip); border-radius:999px; font-size:12px; font-weight:800; white-space:nowrap; }
+    .stats{ display:grid; grid-template-columns:repeat(5,minmax(110px,1fr)); gap:8px; padding:10px 12px 0; }
+    .stat{ background:var(--chip); border-radius:12px; padding:9px 10px; min-width:0; }
+    .stat .k{ color:var(--muted); font-size:11px; margin-bottom:3px; }
+    .stat .v{ font-size:14px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #chart-wrap{ position:relative; display:flex; flex-direction:column; height:calc(100vh - 250px); min-height:440px; padding:8px 8px 2px; }
+    #price-chart{ flex:4; min-height:0; }
+    #volume-chart{ flex:1.15; min-height:0; }
+    .legend{ display:flex; gap:14px; flex-wrap:wrap; align-items:center; padding:0 12px 10px; color:var(--muted); font-size:12px; }
+    .dot{ width:8px; height:8px; display:inline-block; border-radius:50%; margin-right:5px; vertical-align:middle; }
+    .footer-note{ padding:10px 12px 13px; color:var(--muted); font-size:12px; line-height:1.6; }
+    .tooltip{ position:absolute; pointer-events:none; z-index:30; min-width:220px; max-width:310px; padding:9px 10px; border-radius:12px; font-size:12px; color:#fff; background:rgba(17,21,26,.94); box-shadow:0 8px 24px rgba(0,0,0,.25); transform:translate(-50%,-110%); display:none; line-height:1.55; }
+    body.dark .tooltip{ background:rgba(6,8,10,.94); }
+    @media(max-width:900px){ .stats{ grid-template-columns:repeat(2,minmax(120px,1fr)); } }
+    @media(max-width:720px){ #chart-wrap{ height:calc(100vh - 330px); } .panel-head{ flex-direction:column; } .toolbar-left,.toolbar-right{ width:100%; } .toolbar-left select,.toolbar-right select{ flex:1; max-width:100%; } }
+  </style>
 </head>
-<body class="light">
-<div class="wrapper">
-  <div class="header">
-    <select id="period">
-      <option value="7">1週間</option>
-      <option value="30">1ヶ月</option>
-      <option value="180" selected>半年</option>
-      <option value="365">1年</option>
-    </select>
-    <button id="toggle-perc">％</button>
-    <button id="toggle-theme">☀️</button>
+<body>
+<div class="app">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <div class="title" id="company-title">銘柄</div>
+      <select id="company-select"></select>
+    </div>
+    <div class="toolbar-right">
+      <select id="market-source">
+        <option value="topix" selected>市場因子: TOPIX</option>
+        <option value="nikkei">市場因子: 日経平均</option>
+        <option value="none">市場因子なし</option>
+      </select>
+      <div class="range-group">
+        <button class="range-btn" data-range="7">1週</button>
+        <button class="range-btn" data-range="30">1ヶ月</button>
+        <button class="range-btn active" data-range="180">半年</button>
+        <button class="range-btn" data-range="365">1年</button>
+      </div>
+      <button id="toggle-mode">％</button>
+      <button id="toggle-theme">🌙</button>
+    </div>
   </div>
 
-  <div class="chart-area" id="chart-wrap">
-    <div id="candle"></div>
-    <div id="volume"></div>
-    <div class="tooltip hidden" id="tooltip"></div>
-  </div>
-
-  <div class="footer">
-    <div class="legend">
-      <span><span class="dot" style="background:#5b9bff"></span>MA5</span>
-      <span><span class="dot" style="background:#c084fc"></span>MA25</span>
-      <span><span class="dot" style="background:#f6c945"></span>出来高</span>
+  <div class="content">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title" id="panel-title">仮想株価</div>
+          <div class="panel-sub" id="panel-sub">業界共通因子・企業個別因子・ニュース・決算・市場ショックを反映した仮想系列</div>
+        </div>
+        <div class="industry-pill" id="industry-pill">業界</div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="k">現在値</div><div class="v" id="stat-price">-</div></div>
+        <div class="stat"><div class="k">日次騰落</div><div class="v" id="stat-day">-</div></div>
+        <div class="stat"><div class="k">半年騰落</div><div class="v" id="stat-6m">-</div></div>
+        <div class="stat"><div class="k">1年騰落</div><div class="v" id="stat-1y">-</div></div>
+        <div class="stat"><div class="k">市場因子</div><div class="v" id="stat-factor">TOPIX</div></div>
+      </div>
+      <div id="chart-wrap">
+        <div id="price-chart"></div>
+        <div id="volume-chart"></div>
+        <div class="tooltip" id="tooltip"></div>
+      </div>
+      <div class="legend">
+        <span><span class="dot" style="background:#4c8bf5"></span>MA20</span>
+        <span><span class="dot" style="background:#b678ff"></span>MA60</span>
+        <span><span class="dot" style="background:#f6c945"></span>出来高</span>
+      </div>
+      <div class="footer-note">
+        同じ業界の企業は業界共通因子と業界ニュースで似た動きをします。一方で、企業ごとのβ、ボラティリティ、個別ニュース、決算イベントによって、同じ業界でも違うチャートになります。
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-/* ===== Supabase設定 ===== */
-const SUPABASE_URL = "https://ddtszhkycoqnffgciucl.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdHN6aGt5Y29xbmZmZ2NpdWNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMDExODQsImV4cCI6MjA2NDU3NzE4NH0.hASl_SDEf86hISajh9WQ0o5kVTuWZCV7IJ7y363cN9c";
+(() => {
+  const q = new URLSearchParams(location.search);
+  const BACKEND_ENDPOINT = "/api/market-factor";
 
-/* ===== URLパラメータ ===== */
-const q = new URLSearchParams(location.search);
-const COMPANY = q.get("company") || "KATOJI";
-const SRC = (q.get("src") || "fixed").toLowerCase();   // fixed | live
-let days = Number(q.get("days") || 180);
-
-/* ===== ユーティリティ（ローカル日付/JST） ===== */
-function toLocalDateString(d){
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,"0");
-  const day = String(d.getDate()).padStart(2,"0");
-  return `${y}-${m}-${day}`;
-}
-function since(d){
-  const s = new Date();
-  s.setDate(s.getDate() - d);
-  return toLocalDateString(s);
-}
-function todayISO(){
-  return toLocalDateString(new Date());
-}
-
-async function fetchJSON(path){
-  const r = await fetch(SUPABASE_URL + path, {
-    headers:{
-      apikey: SUPABASE_KEY,
-      Authorization: "Bearer " + SUPABASE_KEY
-    }
-  });
-  if(!r.ok){
-    throw new Error(await r.text());
-  }
-  return r.json();
-}
-function hashSeed(str){
-  let h = 2166136261;
-  for(let i=0;i<str.length;i++){
-    h ^= str.charCodeAt(i);
-    h += (h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);
-  }
-  return Math.abs(h % 100000);
-}
-function prng(seed){
-  return function(){
-    seed = Math.sin(seed) * 10000;
-    return seed - Math.floor(seed);
+  const GROUP_STYLE = {
+    energy_infra:{ label:"エネルギー・インフラ", description:"電力・ガス・交通・通信・社会インフラ", drift:0.00018, baseVol:0.013, meanRevert:0.050, marketBetaBase:0.65, groupVol:0.006, shockSensitivity:0.75, newsChance:0.012, industryNewsChance:0.010, marketInfluence:0.18 },
+    materials_resources:{ label:"素材・資源", description:"鉄鋼・化学・素材・資源・繊維", drift:0.00022, baseVol:0.021, meanRevert:0.040, marketBetaBase:1.10, groupVol:0.010, shockSensitivity:1.25, newsChance:0.018, industryNewsChance:0.013, marketInfluence:0.35 },
+    auto_mobility:{ label:"自動車・モビリティー", description:"自動車・部品・EV・航空・移動サービス", drift:0.00026, baseVol:0.020, meanRevert:0.043, marketBetaBase:1.15, groupVol:0.009, shockSensitivity:1.20, newsChance:0.018, industryNewsChance:0.012, marketInfluence:0.38 },
+    makers_machinery:{ label:"メーカー・産業機械", description:"機械・装置・電子部品・工場向け設備", drift:0.00024, baseVol:0.018, meanRevert:0.045, marketBetaBase:1.05, groupVol:0.008, shockSensitivity:1.10, newsChance:0.016, industryNewsChance:0.011, marketInfluence:0.32 },
+    daily_goods:{ label:"生活必需品", description:"日用品・衣料・ベビー用品・家庭用品", drift:0.00020, baseVol:0.012, meanRevert:0.055, marketBetaBase:0.55, groupVol:0.005, shockSensitivity:0.65, newsChance:0.012, industryNewsChance:0.008, marketInfluence:0.16 },
+    healthcare_bio:{ label:"ヘルスケア・バイオ", description:"医療・薬・バイオ・介護・ヘルスケア", drift:0.00032, baseVol:0.026, meanRevert:0.030, marketBetaBase:0.85, groupVol:0.011, shockSensitivity:0.95, newsChance:0.030, industryNewsChance:0.014, marketInfluence:0.22 },
+    finance:{ label:"金融", description:"銀行・証券・保険・決済・リース", drift:0.00020, baseVol:0.019, meanRevert:0.045, marketBetaBase:1.20, groupVol:0.009, shockSensitivity:1.35, newsChance:0.014, industryNewsChance:0.011, marketInfluence:0.40 },
+    it_digital:{ label:"IT・デジタル", description:"ソフトウェア・SaaS・AI・DX", drift:0.00042, baseVol:0.027, meanRevert:0.032, marketBetaBase:1.25, groupVol:0.012, shockSensitivity:1.15, newsChance:0.024, industryNewsChance:0.014, marketInfluence:0.42 },
+    food_restaurant:{ label:"小売・外食", description:"スーパー・飲食店・カフェ・EC・専門店", drift:0.00023, baseVol:0.017, meanRevert:0.047, marketBetaBase:0.80, groupVol:0.008, shockSensitivity:0.90, newsChance:0.020, industryNewsChance:0.011, marketInfluence:0.24 },
+    tourism_leisure:{ label:"観光・レジャー", description:"ホテル・旅行・テーマパーク・娯楽・地域観光", drift:0.00028, baseVol:0.024, meanRevert:0.038, marketBetaBase:1.05, groupVol:0.012, shockSensitivity:1.30, newsChance:0.024, industryNewsChance:0.015, marketInfluence:0.34 },
+    real_estate:{ label:"不動産", description:"不動産開発・賃貸・住宅・管理・建設周辺", drift:0.00024, baseVol:0.018, meanRevert:0.044, marketBetaBase:0.95, groupVol:0.008, shockSensitivity:1.05, newsChance:0.014, industryNewsChance:0.010, marketInfluence:0.30 }
   };
-}
-function stdev(a){
-  if(a.length < 2) return 0.02;
-  const m = a.reduce((x,y)=>x+y,0) / a.length;
-  const v = a.reduce((x,y)=>x + (y-m)*(y-m),0) / (a.length-1);
-  return Math.sqrt(v);
-}
 
-/* SB実データの水準・ボラに似せたモックを days 分作成（ヒゲ控えめ） */
-function makeMockLikeSB(days, sbRows, seed){
-  const closes = sbRows.map(r => +r.close);
-  const vols   = sbRows.map(r => +(r.volume || 0));
-  const rets = [];
-  for(let i=1;i<closes.length;i++){
-    rets.push((closes[i]-closes[i-1]) / Math.max(1e-9, closes[i-1]));
-  }
-  const sigma = Math.max(0.01, Math.min(0.15, stdev(rets) || 0.03));
-  let px  = closes.length ? closes[closes.length-1] : 10000;
-  let vol = vols.length
-    ? vols.slice(-Math.min(vols.length,10)).reduce((a,b)=>a+b,0) / Math.min(vols.length,10)
-    : 20000;
+  const PRESET_COMPANIES = [
+    { code:"ENE01", label:"中部電力", group:"energy_infra" }, { code:"ENE02", label:"まちインフラ", group:"energy_infra" },
+    { code:"MAT01", label:"名古屋特殊鋼", group:"materials_resources" }, { code:"MAT02", label:"東海ケミカル", group:"materials_resources" },
+    { code:"MOB01", label:"トヨタ自動車", group:"auto_mobility" }, { code:"MOB02", label:"アイチモビリティ", group:"auto_mobility" },
+    { code:"IND01", label:"ミライ産業機械", group:"makers_machinery" }, { code:"IND02", label:"中部ロボティクス", group:"makers_machinery" },
+    { code:"LIF01", label:"カトージ", group:"daily_goods" }, { code:"LIF02", label:"くらし用品HD", group:"daily_goods" },
+    { code:"HLT01", label:"ミライバイオ", group:"healthcare_bio" }, { code:"HLT02", label:"地域メディカル", group:"healthcare_bio" },
+    { code:"FIN01", label:"あいち銀行", group:"finance" }, { code:"FIN02", label:"東海フィナンス", group:"finance" },
+    { code:"DIG01", label:"ソフトネクスト", group:"it_digital" }, { code:"DIG02", label:"ナゴヤAIラボ", group:"it_digital" },
+    { code:"FOO01", label:"まちのベーカリー", group:"food_restaurant" }, { code:"FOO02", label:"ご当地カフェ", group:"food_restaurant" },
+    { code:"TOU01", label:"観光まちづくりHD", group:"tourism_leisure" }, { code:"TOU02", label:"温泉レジャー", group:"tourism_leisure" },
+    { code:"REA01", label:"地域不動産開発", group:"real_estate" }, { code:"REA02", label:"駅前ビル管理", group:"real_estate" }
+  ];
 
-  const rnd  = prng(seed);
-  const base = new Date();
-  base.setDate(base.getDate() - days);
-  const out = [];
+  const DAYS_TOTAL = 900;
+  let visibleDays = Number(q.get("days") || 180);
+  let marketSource = q.get("market") || "topix";
+  let priceMode = "abs";
+  let currentCompany = q.get("company") || "ENE01";
+  let chartPrice, chartVol, seriesCandle, seriesVol, seriesMa20, seriesMa60;
+  let currentData = null;
+  let globalPack = null;
 
-  for(let i=0;i<days;i++){
-    const d = new Date(base);
-    d.setDate(base.getDate() + i + 1);
-    const day = toLocalDateString(d);
+  const $ = id => document.getElementById(id);
+  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
-    const u = Math.max(1e-6, rnd());
-    const v = Math.max(1e-6, rnd());
-    const z = Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+  function mulberry32(a){ return function(){ let t = a += 0x6D2B79F5; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  function hashSeed(str){ let h = 2166136261 >>> 0; for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function randn(rng){ let u=0,v=0; while(u===0) u=rng(); while(v===0) v=rng(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+  function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+  function fmtDate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 
-    const ret   = z * sigma * 0.45;      // 変動小さめ
-    const open  = px;
-    const close = Math.max(50, open*(1+ret));
-
-    const rangeBase  = Math.max(open*0.002, Math.abs(ret)*open*1.2);
-    const intraNoise = 150 + 350*rnd();
-    const range = rangeBase + intraNoise;
-
-    const high = Math.max(open, close) + range*0.25*rnd();
-    const low  = Math.min(open, close)  - range*0.25*rnd();
-
-    px  = close;
-    vol = Math.max(1000, vol*(0.9 + 0.2*rnd()));
-
-    out.push({
-      trade_date: day,
-      open:  +open.toFixed(2),
-      high:  +high.toFixed(2),
-      low:   +low.toFixed(2),
-      close: +close.toFixed(2),
-      volume: Math.round(vol)
-    });
-  }
-  return out;
-}
-
-/* OHLCV + 当日価格をまとめて rows にする */
-async function getRows(days){
-  const sinceStr = since(days);
-  const table = SRC === "live" ? "company_daily_ohlcv_live" : "company_daily_ohlcv";
-
-  let sb = [];
-  try{
-    sb = await fetchJSON(
-      `/rest/v1/${table}?company_name=eq.${encodeURIComponent(COMPANY)}` +
-      `&trade_date=gte.${sinceStr}` +
-      `&select=trade_date,open,high,low,close,volume&order=trade_date.asc`
-    );
-  }catch(e){
-    console.error("ohlcv fetch error", e);
+  function createBusinessDays(total){
+    const out=[];
+    let d=addDays(new Date(), -Math.ceil(total*1.55));
+    while(out.length<total){
+      if(d.getDay()!==0 && d.getDay()!==6) out.push(new Date(d));
+      d=addDays(d,1);
+    }
+    return out;
   }
 
-  // ★ 当日の価格だけ company_daily_price から取得して上書き（点＝OHLC 同値）
-  try{
-    const tStr = todayISO();
-    const pr = await fetchJSON(
-      `/rest/v1/company_daily_price?company_name=eq.${encodeURIComponent(COMPANY)}` +
-      `&trade_date=eq.${tStr}` +
-      `&select=trade_date,current_price&limit=1`
-    );
-    if(pr && pr.length){
-      const p = pr[0];
-      const price = Number(p.current_price);
-      if(!isNaN(price)){
-        const todayRow = {
-          trade_date: p.trade_date,
-          open:  price,
-          high:  price,
-          low:   price,
-          close: price,
-          volume: 0
-        };
-        const idx = sb.findIndex(r => r.trade_date === p.trade_date);
-        if(idx >= 0){
-          sb[idx] = todayRow;          // 当日のローソクを点に置き換え（出来高0）
-        }else{
-          sb.push(todayRow);
-          sb.sort((a,b)=>a.trade_date.localeCompare(b.trade_date));
+  function companyFromCode(code){
+    const found = PRESET_COMPANIES.find(x => x.code === code);
+    if(found) return found;
+    const groups = Object.keys(GROUP_STYLE);
+    const g = groups[hashSeed(code) % groups.length];
+    return { code, label:code, group:g };
+  }
+
+  function movingAverage(rows,n){
+    const out=[]; let sum=0; const buf=[];
+    for(const r of rows){
+      buf.push(r.close); sum += r.close;
+      if(buf.length>n) sum -= buf.shift();
+      out.push({ time:r.time, value:buf.length===n ? +(sum/n).toFixed(2) : NaN });
+    }
+    return out;
+  }
+
+  function nearestIndex(rows,targetTime){
+    let lo=0, hi=rows.length-1;
+    while(lo<hi){ const mid=(lo+hi)>>1; if(rows[mid].time<targetTime) lo=mid+1; else hi=mid; }
+    return lo;
+  }
+
+  function computeReturnsFromCloses(series, targetDates){
+    const closeMap = new Map();
+    for(const row of series){ if(row?.date && Number.isFinite(Number(row.close))) closeMap.set(row.date, Number(row.close)); }
+    const target = targetDates.map(d => ({ date:fmtDate(d), close:closeMap.get(fmtDate(d)) ?? null }));
+    let lastClose = null;
+    for(const row of target){ if(row.close == null) row.close = lastClose; else lastClose = row.close; }
+    const firstValid = target.find(r => r.close != null)?.close ?? 1000;
+    for(const row of target){ if(row.close == null) row.close = firstValid; }
+    return target.map((r,i) => i === 0 ? 0 : clamp(r.close / target[i-1].close - 1, -0.12, 0.12));
+  }
+
+  function makeFallbackMarketReturns(dates, seed){
+    const rng = mulberry32(seed);
+    const arr=[]; let regime=0;
+    for(let i=0;i<dates.length;i++){
+      regime = 0.985 * regime + randn(rng) * 0.0028;
+      let r = regime + randn(rng) * 0.0065;
+      if(rng() < 0.011) r += -(0.04 + rng() * 0.08);
+      arr.push(clamp(r, -0.12, 0.10));
+    }
+    return arr;
+  }
+
+  async function fetchExternalMarketReturns(indexName, dates){
+    if(indexName === "none") return new Array(dates.length).fill(0);
+    try{
+      const res = await fetch(`${BACKEND_ENDPOINT}?index=${encodeURIComponent(indexName)}`, { cache:"no-store" });
+      if(!res.ok) throw new Error(`market fetch failed: ${res.status}`);
+      const json = await res.json();
+      return computeReturnsFromCloses(json, dates);
+    }catch(err){
+      console.warn("market API failed, fallback used", err);
+      return makeFallbackMarketReturns(dates, hashSeed(indexName + "::fallback"));
+    }
+  }
+
+  function generateWorld(dates, externalMarketReturns){
+    const rng = mulberry32(20260313);
+    const market = externalMarketReturns.slice(-dates.length);
+    while(market.length < dates.length) market.unshift(0);
+
+    const groups = {}, groupNews = {}, groupNewsMeta = {}, gRegime = {};
+    for(const g of Object.keys(GROUP_STYLE)){
+      groups[g] = new Array(dates.length).fill(0);
+      groupNews[g] = new Array(dates.length).fill(0);
+      groupNewsMeta[g] = {};
+      gRegime[g] = 0;
+    }
+
+    const shocks = new Array(dates.length).fill(0);
+    const shockMeta = {};
+
+    for(let i=0;i<dates.length;i++){
+      for(const g of Object.keys(GROUP_STYLE)){
+        const style = GROUP_STYLE[g];
+        gRegime[g] = 0.97 * gRegime[g] + randn(rng) * style.groupVol;
+
+        if(rng() < style.industryNewsChance){
+          const sign = rng() < 0.54 ? 1 : -1;
+          const amp = sign * (0.012 + rng() * 0.050);
+          groupNews[g][i] += amp;
+          groupNewsMeta[g][i] = amp;
         }
+        if(i > 0) groupNews[g][i] += groupNews[g][i - 1] * 0.72;
+
+        groups[g][i] = gRegime[g] + randn(rng) * style.groupVol * 0.45 + market[i] * style.marketInfluence + groupNews[g][i];
+      }
+
+      if(market[i] < -0.03 || rng() < 0.006){
+        const shock = market[i] < -0.03 ? clamp(market[i] * (0.8 + rng() * 0.5), -0.16, -0.03) : -(0.04 + rng() * 0.08);
+        shocks[i] = shock;
+        shockMeta[i] = shock;
       }
     }
-  }catch(e){
-    console.error("price fetch error", e);
+    return { market, groups, groupNewsMeta, shocks, shockMeta };
   }
 
-  // days 分の連続した日付（最後はローカルの今日）
-  const dayList = [];
-  const s = new Date();
-  s.setDate(s.getDate() - days);
-  for(let i=0;i<days;i++){
-    const d = new Date(s);
-    d.setDate(s.getDate() + i + 1);
-    dayList.push(toLocalDateString(d));
+  function generateCompanySeries(company, dates, world){
+    const seed = hashSeed(company.code + "::virtual_stock");
+    const rng = mulberry32(seed);
+    const style = GROUP_STYLE[company.group] || GROUP_STYLE.daily_goods;
+    const rows=[];
+
+    const betaMarket = style.marketBetaBase * (0.80 + rng() * 0.50);
+    const betaGroup = 0.60 + rng() * 0.95;
+    const idioVol = style.baseVol * (0.65 + rng() * 0.90);
+    const driftAdj = style.drift + (rng() - 0.5) * 0.00028;
+    const meanLevel = 0.90 + rng() * 0.25;
+    const jumpBias = (rng() - 0.5) * 0.0012;
+    const gapiness = 0.15 + rng() * 0.55;
+    const earningsOffset = hashSeed(company.code + "::earnings") % 60;
+
+    let price = 700 + (hashSeed(company.code) % 9000);
+    let volumeBase = 90000 + (hashSeed(company.code + "vol") % 220000);
+    let trendState = 0;
+    let newsImpact = 0;
+    let volMemory = 1;
+    const newsMap = {}, earningsMap = {};
+
+    for(let i=0;i<dates.length;i++){
+      const market = world.market[i];
+      const group = world.groups[company.group][i];
+      const shock = world.shocks[i];
+
+      trendState = 0.92 * trendState + randn(rng) * 0.0025;
+      const fair = meanLevel * (1000 + (hashSeed(company.code) % 6000));
+      const mispricing = Math.log(Math.max(1, price) / fair);
+
+      if(rng() < style.newsChance){
+        const sign = rng() < 0.56 ? 1 : -1;
+        const amp = sign * (0.018 + rng() * 0.085);
+        newsImpact += amp;
+        newsMap[i] = amp;
+      }
+
+      if(i > 80 && (i - earningsOffset) % 60 === 0){
+        const amp = clamp(randn(rng) * 0.045 + randn(rng) * 0.025, -0.12, 0.14);
+        newsImpact += amp;
+        earningsMap[i] = amp;
+      }
+
+      newsImpact *= 0.78;
+      const shockLoading = shock !== 0 ? style.shockSensitivity * (0.75 + rng() * 0.6) : 0;
+
+      const ret = driftAdj + betaMarket * market + betaGroup * group + trendState - style.meanRevert * mispricing + jumpBias + newsImpact + shockLoading * shock + randn(rng) * idioVol * volMemory;
+      const cappedRet = clamp(ret, -0.22, 0.22);
+
+      const open = price;
+      const gap = randn(rng) * idioVol * 0.28 * gapiness + (newsMap[i] || 0) * 0.45 + (earningsMap[i] || 0) * 0.55 + shock * 0.25;
+      const gapOpen = Math.max(40, open * (1 + clamp(gap, -0.08, 0.08)));
+      const close = Math.max(40, gapOpen * (1 + cappedRet));
+
+      const wickBase = Math.abs(cappedRet) * 0.55 + idioVol * (0.55 + rng() * 1.1) + Math.abs(newsImpact) * 0.35 + Math.abs(shock) * 0.45;
+      const high = Math.max(gapOpen, close) * (1 + clamp(wickBase * (0.35 + rng()), 0.002, 0.18));
+      const low = Math.min(gapOpen, close) * (1 - clamp(wickBase * (0.35 + rng()), 0.002, 0.18));
+
+      volMemory = 0.82 * volMemory + 0.18 * (1 + Math.abs(cappedRet) * 14 + Math.abs(newsImpact) * 18 + Math.abs(shock) * 20);
+      volumeBase *= (0.995 + rng() * 0.012);
+      const volume = Math.round(Math.max(5000, volumeBase * volMemory * (0.85 + rng() * 0.45)));
+
+      rows.push({
+        time:fmtDate(dates[i]), open:+gapOpen.toFixed(2), high:+high.toFixed(2), low:+Math.max(1,low).toFixed(2), close:+close.toFixed(2), volume,
+        news:newsMap[i] || 0,
+        earnings:earningsMap[i] || 0,
+        industryNews:world.groupNewsMeta?.[company.group]?.[i] || 0,
+        shock:world.shockMeta[i] || 0,
+        marketReturn:market,
+        industryReturn:group,
+        industryLabel:style.label
+      });
+      price = close;
+    }
+    return rows;
   }
 
-  const seed = hashSeed(COMPANY);
-  const mock = makeMockLikeSB(days, sb, seed);
-  const map  = new Map(sb.map(r => [r.trade_date, r]));
+  async function buildWorldAndAllCompanies(indexName){
+    const dates = createBusinessDays(DAYS_TOTAL);
+    const externalReturns = await fetchExternalMarketReturns(indexName, dates);
+    const world = generateWorld(dates, externalReturns);
+    const pack = { dates, world, companies:{}, marketSource:indexName, externalReturns };
+    const codes = [...new Set([...PRESET_COMPANIES.map(x => x.code), currentCompany])];
+    for(const code of codes){
+      const info = companyFromCode(code);
+      pack.companies[code] = { info, rows:generateCompanySeries(info, dates, world) };
+    }
+    return pack;
+  }
 
-  const merged = dayList.map(d => map.get(d) || mock.find(m => m.trade_date === d));
-  return merged.filter(Boolean);
-}
+  function initCompanyOptions(){
+    const sel = $("company-select");
+    const codes = [...new Set([...PRESET_COMPANIES.map(x => x.code), currentCompany])];
+    sel.innerHTML = "";
+    for(const code of codes){
+      const info = companyFromCode(code);
+      const opt = document.createElement("option");
+      opt.value = info.code;
+      opt.textContent = `${info.label} / ${GROUP_STYLE[info.group]?.label ?? info.group}`;
+      if(info.code === currentCompany) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  }
 
-/* ===== 描画 ===== */
-let priceMode = "abs";
-let candleChart, volChart, candleSeries, volSeries, ma5Series, ma25Series;
-let currentRows = [];
+  function destroyCharts(){ if(chartPrice){ chartPrice.remove(); chartPrice=null; } if(chartVol){ chartVol.remove(); chartVol=null; } }
 
-function movingAverage(rows,n){
-  const out = [];
-  let sum = 0;
-  const buf = [];
-  for(const r of rows){
-    const c = +r.close;
-    buf.push(c);
-    sum += c;
-    if(buf.length > n) sum -= buf.shift();
-    out.push({
-      time: r.trade_date,
-      value: buf.length === n ? +(sum/n).toFixed(2) : NaN
+  function createCharts(){
+    destroyCharts();
+    const cs = getComputedStyle(document.body);
+    const bg=cs.getPropertyValue("--bg").trim(), text=cs.getPropertyValue("--text").trim(), grid=cs.getPropertyValue("--grid").trim(), up=cs.getPropertyValue("--up").trim(), down=cs.getPropertyValue("--down").trim();
+
+    const baseOptions = {
+      autoSize:true,
+      layout:{ background:{ color:bg }, textColor:text },
+      grid:{ vertLines:{ color:grid }, horzLines:{ color:grid } },
+      rightPriceScale:{ borderVisible:false, autoScale:true },
+      timeScale:{ borderVisible:false, timeVisible:true, secondsVisible:false, rightOffset:6 },
+      handleScroll:{ mouseWheel:true, pressedMouseMove:true, horzTouchDrag:true, vertTouchDrag:true },
+      handleScale:{ mouseWheel:true, pinch:true, axisPressedMouseMove:true }
+    };
+
+    chartPrice = LightweightCharts.createChart($("price-chart"), { ...baseOptions, crosshair:{ mode:LightweightCharts.CrosshairMode.Normal } });
+    chartVol = LightweightCharts.createChart($("volume-chart"), baseOptions);
+
+    seriesCandle = chartPrice.addCandlestickSeries({ upColor:up, downColor:down, borderUpColor:up, borderDownColor:down, wickUpColor:up, wickDownColor:down });
+    seriesMa20 = chartPrice.addLineSeries({ color:"#4c8bf5", lineWidth:2, priceLineVisible:false, lastValueVisible:false });
+    seriesMa60 = chartPrice.addLineSeries({ color:"#b678ff", lineWidth:2, priceLineVisible:false, lastValueVisible:false });
+    seriesVol = chartVol.addHistogramSeries({ priceFormat:{ type:"volume" }, priceScaleId:"" });
+    chartVol.priceScale("").applyOptions({ scaleMargins:{ top:0.1, bottom:0 } });
+
+    let syncing=false;
+    function sync(from,to){ from.timeScale().subscribeVisibleLogicalRangeChange(range => { if(syncing || !range) return; syncing=true; to.timeScale().setVisibleLogicalRange(range); syncing=false; }); }
+    sync(chartPrice, chartVol); sync(chartVol, chartPrice);
+    bindTooltip();
+  }
+
+  function setSeriesData(rows){
+    seriesCandle.setData(rows.map(r => ({ time:r.time, open:r.open, high:r.high, low:r.low, close:r.close })));
+    seriesVol.setData(rows.map(r => ({ time:r.time, value:r.volume, color:r.close >= r.open ? "rgba(22,160,133,0.65)" : "rgba(231,76,60,0.65)" })));
+    seriesMa20.setData(movingAverage(rows,20));
+    seriesMa60.setData(movingAverage(rows,60));
+  }
+
+  function applyRange(days){
+    const rows = currentData.rows;
+    const len = rows.length;
+    const fromIndex = Math.max(0, len - days), toIndex = len - 1;
+    chartPrice.timeScale().setVisibleLogicalRange({ from:fromIndex - 8, to:toIndex + 6 });
+    chartVol.timeScale().setVisibleLogicalRange({ from:fromIndex - 8, to:toIndex + 6 });
+  }
+
+  function updateStats(rows){
+    const last=rows[rows.length-1], prev=rows[rows.length-2] || last;
+    const dayRet=(last.close/prev.close-1)*100;
+    const r6mBase=rows[Math.max(0,rows.length-181)]?.close || rows[0].close;
+    const r1yBase=rows[Math.max(0,rows.length-366)]?.close || rows[0].close;
+    const r6m=(last.close/r6mBase-1)*100, r1y=(last.close/r1yBase-1)*100;
+    $("stat-price").textContent = last.close.toLocaleString("ja-JP", { maximumFractionDigits:2 });
+    $("stat-day").textContent = `${dayRet >= 0 ? "+" : ""}${dayRet.toFixed(2)}%`;
+    $("stat-6m").textContent = `${r6m >= 0 ? "+" : ""}${r6m.toFixed(2)}%`;
+    $("stat-1y").textContent = `${r1y >= 0 ? "+" : ""}${r1y.toFixed(2)}%`;
+    $("stat-factor").textContent = marketSource === "topix" ? "TOPIX" : marketSource === "nikkei" ? "日経平均" : "なし";
+  }
+
+  function setHeader(info){
+    const style = GROUP_STYLE[info.group];
+    const marketText = marketSource === "topix" ? "TOPIX" : marketSource === "nikkei" ? "日経平均" : "なし";
+    $("company-title").textContent = `銘柄: ${info.label}`;
+    $("panel-title").textContent = `${info.label} の仮想株価`;
+    $("panel-sub").textContent = `業界: ${style?.label ?? info.group} / 市場因子: ${marketText} / ${style?.description ?? ""}`;
+    $("industry-pill").textContent = style?.label ?? info.group;
+  }
+
+  function applyPriceMode(){
+    chartPrice.priceScale("right").applyOptions({ mode:priceMode === "pct" ? LightweightCharts.PriceScaleMode.Percentage : LightweightCharts.PriceScaleMode.Normal, autoScale:true });
+    $("toggle-mode").classList.toggle("active", priceMode === "pct");
+  }
+
+  function bindTooltip(){
+    const tooltip=$("tooltip"), wrap=$("chart-wrap");
+    chartPrice.subscribeCrosshairMove(param => {
+      if(!param?.time || !param.point){ tooltip.style.display="none"; return; }
+      const rows=currentData.rows;
+      const idx=nearestIndex(rows, String(param.time));
+      const r=rows[idx];
+      if(!r){ tooltip.style.display="none"; return; }
+      const dayRet = idx > 0 ? (r.close / rows[idx-1].close - 1) * 100 : 0;
+      let eventText="";
+      if(r.shock) eventText = `市場ショック ${(r.shock*100).toFixed(1)}%`;
+      else if(r.earnings) eventText = `決算イベント ${r.earnings>0?"+":""}${(r.earnings*100).toFixed(1)}%`;
+      else if(r.industryNews) eventText = `業界ニュース ${r.industryNews>0?"+":""}${(r.industryNews*100).toFixed(1)}%`;
+      else if(r.news) eventText = `個別ニュース ${r.news>0?"+":""}${(r.news*100).toFixed(1)}%`;
+
+      tooltip.innerHTML = `
+        <div style="font-weight:800; margin-bottom:4px;">${r.time}</div>
+        <div>始値 ${r.open.toFixed(2)} / 高値 ${r.high.toFixed(2)}</div>
+        <div>安値 ${r.low.toFixed(2)} / 終値 ${r.close.toFixed(2)}</div>
+        <div>日次騰落 ${dayRet>=0?"+":""}${dayRet.toFixed(2)}%</div>
+        <div>市場因子 ${r.marketReturn*100>=0?"+":""}${(r.marketReturn*100).toFixed(2)}%</div>
+        <div>業界因子 ${r.industryReturn*100>=0?"+":""}${(r.industryReturn*100).toFixed(2)}%</div>
+        <div>出来高 ${r.volume.toLocaleString("ja-JP")}</div>
+        ${eventText ? `<div style="margin-top:4px; color:#ffd76a; font-weight:800;">${eventText}</div>` : ""}
+      `;
+      tooltip.style.display="block";
+      const rect=wrap.getBoundingClientRect();
+      tooltip.style.left = `${clamp(param.point.x, 120, rect.width-120)}px`;
+      tooltip.style.top = `${clamp(param.point.y, 70, rect.height-30)}px`;
     });
   }
-  return out;
-}
 
-function draw(rows){
-  const wrap = document.getElementById("chart-wrap");
-  wrap.innerHTML = '<div id="candle"></div><div id="volume"></div><div class="tooltip hidden" id="tooltip"></div>';
-
-  const cs   = getComputedStyle(document.body);
-  const bg   = cs.getPropertyValue("--bg").trim();
-  const tx   = cs.getPropertyValue("--text").trim();
-  const grid = cs.getPropertyValue("--grid").trim();
-
-  // メインチャート
-  candleChart = LightweightCharts.createChart(document.getElementById("candle"),{
-    layout:{background:{color:bg},textColor:tx},
-    rightPriceScale:{autoScale:true},
-    timeScale:{timeVisible:true,borderVisible:false},
-    grid:{horzLines:{color:grid},vertLines:{color:grid}},
-    handleScroll:{mouseWheel:true,pressedMouseMove:true},
-    handleScale:{axisPressedMouseMove:true,pinch:true},
-    autoSize:true
-  });
-
-  candleSeries = candleChart.addCandlestickSeries({
-    upColor:"#26a69a",
-    downColor:"#ef5350",
-    borderUpColor:"#26a69a",
-    borderDownColor:"#ef5350",
-    wickUpColor:"#26a69a",
-    wickDownColor:"#ef5350"
-  });
-
-  const candles = rows.map(r => ({
-    time:  r.trade_date,
-    open:  +r.open,
-    high:  +r.high,
-    low:   +r.low,
-    close: +r.close
-  }));
-  candleSeries.setData(candles);
-
-  ma5Series = candleChart.addLineSeries({color:"#5b9bff",lineWidth:2,priceLineVisible:false});
-  ma5Series.setData(movingAverage(rows,5));
-  ma25Series = candleChart.addLineSeries({color:"#c084fc",lineWidth:2,priceLineVisible:false});
-  ma25Series.setData(movingAverage(rows,25));
-
-  candleChart.priceScale("right").applyOptions({
-    mode: priceMode === "pct"
-      ? LightweightCharts.PriceScaleMode.Percentage
-      : LightweightCharts.PriceScaleMode.Normal,
-    autoScale:true
-  });
-
-  // 出来高チャート
-  volChart = LightweightCharts.createChart(document.getElementById("volume"),{
-    layout:{background:{color:bg},textColor:tx},
-    rightPriceScale:{autoScale:true},
-    timeScale:{visible:true},
-    grid:{horzLines:{color:grid},vertLines:{color:grid}},
-    handleScroll:{mouseWheel:true,pressedMouseMove:true},
-    handleScale:{axisPressedMouseMove:true,pinch:true},
-    autoSize:true
-  });
-
-  volSeries = volChart.addHistogramSeries({
-    color:getComputedStyle(document.documentElement).getPropertyValue("--vol").trim(),
-    priceFormat:{type:"volume"}
-  });
-
-  const vols = rows.map(r => ({
-    time:  r.trade_date,
-    value: +(r.volume || 0)
-  }));
-  volSeries.setData(vols);
-
-  const N = rows.length;
-  const logical = {from:0,to:Math.max(1,N-1)};
-  candleChart.timeScale().setVisibleLogicalRange(logical);
-  volChart.timeScale().setVisibleLogicalRange(logical);
-
-  let syncing = false;
-  function bind(a,b){
-    a.timeScale().subscribeVisibleTimeRangeChange(r=>{
-      if(syncing || !r) return;
-      syncing = true;
-      b.timeScale().setVisibleRange(r);
-      syncing = false;
-    });
-    a.timeScale().subscribeVisibleLogicalRangeChange(r=>{
-      if(syncing || !r) return;
-      syncing = true;
-      b.timeScale().setVisibleLogicalRange(r);
-      syncing = false;
-    });
-  }
-  bind(candleChart,volChart);
-  bind(volChart,candleChart);
-}
-
-/* ===== 起動 & UI ===== */
-(async function init(){
-  const sel = document.getElementById("period");
-  if([].some.call(sel.options,o => +o.value === days)){
-    sel.value = String(days);
-  }
-
-  try{
-    currentRows = await getRows(days);
-    draw(currentRows);
-  }catch(e){
-    console.error("init error", e);
-  }
-
-  sel.onchange = async function(e){
-    days = +e.target.value;
+  async function renderCompany(code){
+    currentCompany = code;
+    if(!globalPack.companies[code]){
+      const info = companyFromCode(code);
+      globalPack.companies[code] = { info, rows:generateCompanySeries(info, globalPack.dates, globalPack.world) };
+    }
+    currentData = globalPack.companies[code];
+    setHeader(currentData.info);
+    createCharts();
+    setSeriesData(currentData.rows);
+    updateStats(currentData.rows);
+    applyPriceMode();
+    applyRange(visibleDays);
     const u = new URL(location.href);
-    u.searchParams.set("days",days);
-    history.replaceState(null,"",u);
-    currentRows = await getRows(days);
-    draw(currentRows);
-  };
-
-  const percBtn = document.getElementById("toggle-perc");
-  function setPercUI(){
-    if(priceMode === "pct") percBtn.classList.add("active");
-    else percBtn.classList.remove("active");
+    u.searchParams.set("company", code);
+    u.searchParams.set("days", String(visibleDays));
+    u.searchParams.set("market", marketSource);
+    history.replaceState(null, "", u);
   }
-  percBtn.onclick = function(){
-    priceMode = (priceMode === "pct" ? "abs" : "pct");
-    setPercUI();
-    draw(currentRows);
-  };
-  setPercUI();
 
-  const themeBtn = document.getElementById("toggle-theme");
-  themeBtn.onclick = function(){
-    document.body.classList.toggle("light");
-    themeBtn.textContent = document.body.classList.contains("light") ? "☀️" : "🌙";
-    draw(currentRows);
-  };
+  async function rebuildAllWithMarket(indexName){
+    marketSource = indexName;
+    $("market-source").value = indexName;
+    globalPack = await buildWorldAndAllCompanies(indexName);
+    await renderCompany(currentCompany);
+  }
+
+  function bindUI(){
+    $("company-select").addEventListener("change", e => renderCompany(e.target.value));
+    $("market-source").addEventListener("change", e => rebuildAllWithMarket(e.target.value));
+
+    document.querySelectorAll(".range-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        visibleDays = Number(btn.dataset.range);
+        document.querySelectorAll(".range-btn").forEach(b => b.classList.toggle("active", b === btn));
+        applyRange(visibleDays);
+        const u = new URL(location.href);
+        u.searchParams.set("company", currentCompany);
+        u.searchParams.set("days", String(visibleDays));
+        u.searchParams.set("market", marketSource);
+        history.replaceState(null, "", u);
+      });
+    });
+
+    document.querySelectorAll(".range-btn").forEach(b => b.classList.toggle("active", Number(b.dataset.range) === visibleDays));
+
+    $("toggle-mode").addEventListener("click", () => { priceMode = priceMode === "abs" ? "pct" : "abs"; applyPriceMode(); });
+    $("toggle-theme").addEventListener("click", async () => { document.body.classList.toggle("dark"); $("toggle-theme").textContent = document.body.classList.contains("dark") ? "☀️" : "🌙"; await renderCompany(currentCompany); });
+    window.addEventListener("resize", () => { if(chartPrice) chartPrice.applyOptions({}); if(chartVol) chartVol.applyOptions({}); });
+  }
+
+  async function init(){
+    $("market-source").value = marketSource;
+    initCompanyOptions();
+    bindUI();
+    globalPack = await buildWorldAndAllCompanies(marketSource);
+    await renderCompany(currentCompany);
+  }
+
+  init();
 })();
 </script>
 </body>
