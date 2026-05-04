@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>投資クン 株価チャート</title>
+  <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f7fa;
+      color: #111;
+    }
+    .app {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 12px;
+    }
+    .header {
+      background: #fff;
+      border-radius: 14px;
+      padding: 14px 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      margin-bottom: 10px;
+    }
+    .name {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .price-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .price {
+      font-size: 36px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .change {
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .up { color: #d93025; }
+    .down { color: #1a73e8; }
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .tab {
+      border: none;
+      border-radius: 10px;
+      padding: 10px;
+      background: #e9eef5;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .tab.active {
+      background: #111827;
+      color: #fff;
+    }
+    .chart-card {
+      position: relative;
+      background: #fff;
+      border-radius: 14px;
+      padding: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+    #chart {
+      width: 100%;
+      height: 520px;
+    }
+    .ma-box {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      background: rgba(255,255,255,0.9);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      line-height: 1.4;
+      z-index: 10;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+    }
+    .tooltip {
+      position: absolute;
+      display: none;
+      pointer-events: none;
+      z-index: 20;
+      background: rgba(17,24,39,0.92);
+      color: #fff;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: nowrap;
+    }
+    .footer-note {
+      color: #666;
+      font-size: 11px;
+      margin-top: 8px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="name" id="companyName">---</div>
+    <div class="price-row">
+      <div class="price" id="currentPrice">---</div>
+      <div class="change" id="changeText">---</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-mode="5m">5分足</button>
+    <button class="tab" data-mode="1d">日足</button>
+    <button class="tab" data-mode="1w">週足</button>
+    <button class="tab" data-mode="1mo">月足</button>
+  </div>
+
+  <div class="chart-card">
+    <div class="ma-box" id="maBox"></div>
+    <div class="tooltip" id="tooltip"></div>
+    <div id="chart"></div>
+  </div>
+
+  <div class="footer-note">※ 投資クン内の学習用仮想チャートです</div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+
+const companyName = decodeURIComponent(params.get("name") || "サンプル企業");
+const industry = params.get("industry") || "it_digital";
+const currentPrice = Number(params.get("price") || 1000);
+const days = Number(params.get("days") || 180);
+
+document.getElementById("companyName").textContent = companyName;
+document.getElementById("currentPrice").textContent = formatPrice(currentPrice);
+
+const INDUSTRY = {
+  energy_infra:       { vol: 0.008, trend: 0.00010, beta: 0.55 },
+  materials_resources:{ vol: 0.016, trend: 0.00012, beta: 1.05 },
+  auto_mobility:      { vol: 0.018, trend: 0.00013, beta: 1.10 },
+  makers_machinery:   { vol: 0.015, trend: 0.00012, beta: 1.00 },
+  daily_goods:        { vol: 0.007, trend: 0.00008, beta: 0.45 },
+  healthcare_bio:     { vol: 0.022, trend: 0.00016, beta: 0.85 },
+  finance:            { vol: 0.018, trend: 0.00010, beta: 1.25 },
+  it_digital:          { vol: 0.024, trend: 0.00020, beta: 1.30 },
+  food_restaurant:    { vol: 0.013, trend: 0.00010, beta: 0.80 },
+  tourism_leisure:    { vol: 0.020, trend: 0.00014, beta: 1.10 },
+  real_estate:         { vol: 0.015, trend: 0.00009, beta: 1.00 }
+};
+
+const baseSeed = hashString(companyName + "_" + industry);
+const industryParam = INDUSTRY[industry] || INDUSTRY.it_digital;
+
+let chart;
+let candleSeries;
+let volumeSeries;
+let maSeries = [];
+let currentMode = "5m";
+
+function hashString(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function rand(seed) {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+function normal(seed) {
+  const u = Math.max(rand(seed), 1e-9);
+  const v = Math.max(rand(seed + 9999), 1e-9);
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function formatPrice(v) {
+  return Math.round(v).toLocaleString("ja-JP");
+}
+
+function dateStr(d) {
+  return d.toISOString().slice(0,10);
+}
+
+function addDays(d, n) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function isBusinessDay(d) {
+  const day = d.getDay();
+  return day !== 0 && day !== 6;
+}
+
+function makeBusinessDays(count) {
+  const out = [];
+  let d = addDays(new Date(), -Math.ceil(count * 1.7));
+  while (out.length < count) {
+    if (isBusinessDay(d)) out.push(new Date(d));
+    d = addDays(d, 1);
+  }
+  return out;
+}
+
+function generateDaily(count) {
+  const dates = makeBusinessDays(Math.max(count, 260));
+  let price = 800 + (baseSeed % 2500);
+  const rows = [];
+
+  for (let i = 0; i < dates.length; i++) {
+    const d = dates[i];
+    const key = hashString(baseSeed + "_d_" + dateStr(d));
+
+    const market =
+      Math.sin(i / 35 + (baseSeed % 10)) * 0.002 +
+      normal(key + 1) * 0.003;
+
+    const industryMove =
+      Math.sin(i / 28 + (hashString(industry) % 20)) * industryParam.vol * 0.25 +
+      normal(key + 2) * industryParam.vol * 0.35;
+
+    const companyMove =
+      normal(key + 3) * industryParam.vol * 0.32;
+
+    let eventMove = 0;
+    const e = rand(key + 4);
+    if (e > 0.985) eventMove += 0.035 + rand(key + 5) * 0.045;
+    if (e < 0.015) eventMove -= 0.030 + rand(key + 6) * 0.040;
+
+    const ret =
+      market * industryParam.beta +
+      industryMove +
+      companyMove +
+      industryParam.trend +
+      eventMove;
+
+    const open = price;
+    const close = Math.max(80, open * (1 + ret));
+    const high = Math.max(open, close) * (1 + Math.abs(normal(key + 7)) * 0.006);
+    const low = Math.min(open, close) * (1 - Math.abs(normal(key + 8)) * 0.006);
+
+    const volume =
+      Math.round(
+        (50000 + (baseSeed % 500000)) *
+        (1 + Math.abs(ret) * 35) *
+        (0.75 + rand(key + 9) * 0.7)
+      );
+
+    rows.push({
+      time: dateStr(d),
+      open,
+      high,
+      low,
+      close,
+      volume
+    });
+
+    price = close;
+  }
+
+  return scaleToCurrent(rows).slice(-count);
+}
+
+function generateFiveMinute() {
+  const count = 78;
+  const today = new Date();
+  const rows = [];
+  let price = currentPrice * (0.995 + rand(baseSeed + 11) * 0.01);
+
+  for (let i = 0; i < count; i++) {
+    const key = hashString(baseSeed + "_5m_" + i + "_" + dateStr(today));
+    const ret =
+      normal(key) * industryParam.vol * 0.07 +
+      Math.sin(i / 8) * 0.0005;
+
+    const open = price;
+    const close = Math.max(80, open * (1 + ret));
+    const high = Math.max(open, close) * (1 + Math.abs(normal(key + 1)) * 0.0018);
+    const low = Math.min(open, close) * (1 - Math.abs(normal(key + 2)) * 0.0018);
+
+    const t = new Date(today);
+    t.setHours(9, 0, 0, 0);
+    t.setMinutes(t.getMinutes() + i * 5);
+
+    rows.push({
+      time: Math.floor(t.getTime() / 1000),
+      open,
+      high,
+      low,
+      close,
+      volume: Math.round((1000 + baseSeed % 12000) * (1 + Math.abs(ret) * 180))
+    });
+
+    price = close;
+  }
+
+  return scaleToCurrent(rows);
+}
+
+function scaleToCurrent(rows) {
+  const last = rows[rows.length - 1];
+  const scale = currentPrice / last.close;
+
+  return rows.map(r => ({
+    ...r,
+    open: +(r.open * scale).toFixed(2),
+    high: +(r.high * scale).toFixed(2),
+    low: +(r.low * scale).toFixed(2),
+    close: +(r.close * scale).toFixed(2)
+  }));
+}
+
+function aggregate(rows, mode) {
+  const groups = new Map();
+
+  for (const r of rows) {
+    const d = new Date(r.time);
+    let key;
+
+    if (mode === "1w") {
+      const temp = new Date(d);
+      temp.setDate(temp.getDate() - temp.getDay() + 1);
+      key = dateStr(temp);
+    } else {
+      key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`;
+    }
+
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+
+  const out = [];
+  for (const [key, arr] of groups) {
+    out.push({
+      time: key,
+      open: arr[0].open,
+      high: Math.max(...arr.map(x => x.high)),
+      low: Math.min(...arr.map(x => x.low)),
+      close: arr[arr.length - 1].close,
+      volume: arr.reduce((s,x) => s + x.volume, 0)
+    });
+  }
+  return out;
+}
+
+function movingAverage(rows, n) {
+  const out = [];
+  let sum = 0;
+  const q = [];
+
+  for (const r of rows) {
+    q.push(r.close);
+    sum += r.close;
+    if (q.length > n) sum -= q.shift();
+
+    out.push({
+      time: r.time,
+      value: q.length === n ? +(sum / n).toFixed(2) : NaN
+    });
+  }
+  return out;
+}
+
+function getMA(mode) {
+  if (mode === "5m") return [9, 24, 60];
+  if (mode === "1d") return [5, 25, 75];
+  if (mode === "1w") return [13, 26, 52];
+  return [6, 12, 24];
+}
+
+function buildData(mode) {
+  if (mode === "5m") return generateFiveMinute();
+
+  const daily = generateDaily(Math.max(days, 520));
+
+  if (mode === "1d") return daily.slice(-days);
+  if (mode === "1w") return aggregate(daily, "1w").slice(-80);
+  if (mode === "1mo") return aggregate(daily, "1mo").slice(-60);
+
+  return daily;
+}
+
+function render(mode) {
+  currentMode = mode;
+  const data = buildData(mode);
+  const prev = data[data.length - 2];
+  const last = data[data.length - 1];
+
+  const diff = last.close - prev.close;
+  const rate = diff / prev.close * 100;
+  const changeEl = document.getElementById("changeText");
+
+  changeEl.textContent = `${diff >= 0 ? "+" : ""}${diff.toFixed(0)} / ${rate.toFixed(2)}%`;
+  changeEl.className = "change " + (diff >= 0 ? "up" : "down");
+
+  if (chart) chart.remove();
+
+  chart = LightweightCharts.createChart(document.getElementById("chart"), {
+    layout: {
+      background: { color: "#ffffff" },
+      textColor: "#222"
+    },
+    grid: {
+      vertLines: { color: "#edf0f5" },
+      horzLines: { color: "#edf0f5" }
+    },
+    rightPriceScale: {
+      borderColor: "#ddd"
+    },
+    timeScale: {
+      borderColor: "#ddd",
+      timeVisible: mode === "5m"
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal
+    }
+  });
+
+  candleSeries = chart.addCandlestickSeries({
+    upColor: "#d93025",
+    downColor: "#1a73e8",
+    borderUpColor: "#d93025",
+    borderDownColor: "#1a73e8",
+    wickUpColor: "#d93025",
+    wickDownColor: "#1a73e8"
+  });
+
+  candleSeries.setData(data.map(r => ({
+    time: r.time,
+    open: r.open,
+    high: r.high,
+    low: r.low,
+    close: r.close
+  })));
+
+  volumeSeries = chart.addHistogramSeries({
+    priceFormat: { type: "volume" },
+    priceScaleId: "",
+    scaleMargins: { top: 0.78, bottom: 0 }
+  });
+
+  volumeSeries.setData(data.map(r => ({
+    time: r.time,
+    value: r.volume,
+    color: r.close >= r.open ? "rgba(217,48,37,0.45)" : "rgba(26,115,232,0.45)"
+  })));
+
+  maSeries = [];
+  const maList = getMA(mode);
+  const colors = ["#d81bdb", "#1ecb4f", "#4f7edb"];
+  const maBox = document.getElementById("maBox");
+  maBox.innerHTML = `<b>単純移動平均</b><br>`;
+
+  maList.forEach((n, idx) => {
+    const s = chart.addLineSeries({
+      color: colors[idx],
+      lineWidth: 2,
+      priceLineVisible: false
+    });
+    const maData = movingAverage(data, n);
+    s.setData(maData);
+    maSeries.push(s);
+
+    const latest = [...maData].reverse().find(x => Number.isFinite(x.value));
+    maBox.innerHTML += `<span style="color:${colors[idx]}">MA${idx+1}(${n})</span> ${latest ? latest.value.toLocaleString() : "-"}<br>`;
+  });
+
+  chart.timeScale().fitContent();
+
+  const tooltip = document.getElementById("tooltip");
+  chart.subscribeCrosshairMove(param => {
+    if (!param.time || !param.point) {
+      tooltip.style.display = "none";
+      return;
+    }
+
+    const item = data.find(x => String(x.time) === String(param.time));
+    if (!item) {
+      tooltip.style.display = "none";
+      return;
+    }
+
+    tooltip.style.display = "block";
+    tooltip.style.left = Math.min(param.point.x + 20, window.innerWidth - 190) + "px";
+    tooltip.style.top = (param.point.y + 20) + "px";
+
+    tooltip.innerHTML = `
+      <b>${typeof item.time === "number" ? new Date(item.time*1000).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}) : item.time}</b><br>
+      始 ${formatPrice(item.open)}<br>
+      高 ${formatPrice(item.high)}<br>
+      安 ${formatPrice(item.low)}<br>
+      終 ${formatPrice(item.close)}<br>
+      出来高 ${item.volume.toLocaleString("ja-JP")}
+    `;
+  });
+}
+
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    render(btn.dataset.mode);
+  });
+});
+
+window.addEventListener("resize", () => {
+  if (chart) chart.applyOptions({
+    width: document.getElementById("chart").clientWidth
+  });
+});
+
+render("5m");
+</script>
+</body>
+</html>
