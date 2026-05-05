@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>Stock Chart</title>
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+
+<style>
+body { font-family: sans-serif; margin: 0; background: #f7f7f7; }
+.container { padding: 16px; }
+.header { background: #fff; padding: 16px; border-radius: 12px; }
+.tabs { display: flex; gap: 8px; margin-top: 12px; }
+.tab { padding: 10px; border-radius: 8px; background: #ddd; cursor: pointer; }
+.active { background: #111; color: #fff; }
+#chart { height: 400px; margin-top: 12px; background: #fff; border-radius: 12px; }
+</style>
+</head>
+
+<body>
+<div class="container">
+  <div class="header">
+    <div id="name"></div>
+    <div id="price"></div>
+    <div id="industry"></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active">日足</div>
+  </div>
+
+  <div id="chart"></div>
+</div>
+
+<script>
+// ==========================
+// URL取得
+// ==========================
+const params = new URLSearchParams(location.search);
+const name = params.get("name");
+const industry = params.get("industry");
+const price = Number(params.get("price"));
+
+// 表示
+document.getElementById("name").innerText = name;
+document.getElementById("price").innerText = price;
+document.getElementById("industry").innerText = industry;
+
+// ==========================
+// Supabase
+// ==========================
+const SUPABASE_URL = "https://ddtszhkycoqnffgciucl.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdHN6aGt5Y29xbmZmZ2NpdWNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMDExODQsImV4cCI6MjA2NDU3NzE4NH0.hASl_SDEf86hISajh9WQ0o5kVTuWZCV7IJ7y363cN9c";
+
+// ==========================
+// データ取得
+// ==========================
+async function fetchData() {
+  const url = `${SUPABASE_URL}/rest/v1/company_daily_ohlcv?company_name=eq.${encodeURIComponent(name)}&order=date.asc`;
+
+  const res = await fetch(url, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+    }
+  });
+
+  const data = await res.json();
+
+  return data.map(d => ({
+    time: d.date,
+    open: d.open,
+    high: d.high,
+    low: d.low,
+    close: d.close
+  }));
+}
+
+// ==========================
+// チャート
+// ==========================
+async function init() {
+  const data = await fetchData();
+
+  const chart = LightweightCharts.createChart(document.getElementById("chart"), {
+    layout: { background: { color: "#fff" }, textColor: "#000" },
+    grid: { vertLines: { color: "#eee" }, horzLines: { color: "#eee" } }
+  });
+
+  const candle = chart.addCandlestickSeries({
+    upColor: "#e53935",
+    downColor: "#1e88e5",
+    borderVisible: false,
+    wickUpColor: "#e53935",
+    wickDownColor: "#1e88e5"
+  });
+
+  candle.setData(data);
+
+  chart.timeScale().fitContent();
+}
+
+init();
+</script>
+</body>
+</html>
