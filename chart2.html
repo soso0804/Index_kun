@@ -2,95 +2,145 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Stock Chart</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+  <title>投資クン チャート</title>
 
   <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 
   <style>
+    * { box-sizing: border-box; }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       margin: 0;
-      background: #f7f7f7;
-      color: #111;
+      background: #f5f6f8;
+      color: #111827;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overscroll-behavior-y: auto;
     }
 
-    .container {
-      padding: 16px;
+    .app {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 12px;
     }
 
     .header {
       background: #fff;
-      padding: 16px;
-      border-radius: 12px;
-      margin-bottom: 12px;
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
 
     .name {
       font-size: 24px;
-      font-weight: 800;
+      font-weight: 900;
+    }
+
+    .price-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      margin-top: 4px;
+      flex-wrap: wrap;
     }
 
     .price {
-      font-size: 36px;
+      font-size: 42px;
       font-weight: 900;
-      margin-top: 4px;
+      line-height: 1;
     }
 
+    .change {
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .up { color: #d93025; }
+    .down { color: #1a73e8; }
+
     .industry {
+      margin-top: 8px;
       font-size: 13px;
       color: #555;
-      margin-top: 4px;
+      font-weight: 600;
     }
 
     .tabs {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
       gap: 8px;
-      margin: 12px 0;
+      margin-bottom: 10px;
     }
 
     .tab {
-      padding: 10px 16px;
-      border-radius: 8px;
-      background: #ddd;
-      font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      padding: 12px;
+      background: #e9eef5;
+      font-size: 16px;
+      font-weight: 900;
       cursor: pointer;
     }
 
     .tab.active {
-      background: #111;
-      color: #fff;
+      background: #111827;
+      color: white;
+      box-shadow: inset 0 0 0 2px #1677ff;
     }
 
-    .chart-wrap {
+    .chart-card {
       position: relative;
       background: #fff;
-      border-radius: 12px;
-      padding: 8px;
+      border-radius: 14px;
+      padding: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      overflow: hidden;
     }
 
-    #chart {
-      height: 460px;
+    .price-chart-wrap {
+      position: relative;
       width: 100%;
+      height: 410px;
+      touch-action: pan-y pinch-zoom;
     }
 
-    .message {
-      padding: 16px;
-      color: #666;
-      font-size: 14px;
+    .volume-chart-wrap {
+      position: relative;
+      width: 100%;
+      height: 130px;
+      margin-top: 4px;
+      border-top: 1px solid #eef1f5;
+      touch-action: pan-y pinch-zoom;
+    }
+
+    #priceChart,
+    #volumeChart {
+      width: 100%;
+      height: 100%;
     }
 
     .ma-box {
       position: absolute;
-      top: 18px;
-      left: 18px;
-      background: rgba(255,255,255,0.92);
-      padding: 8px 10px;
+      top: 14px;
+      left: 14px;
+      z-index: 10;
+      background: rgba(255,255,255,0.94);
       border-radius: 8px;
+      padding: 8px 10px;
       font-size: 12px;
       line-height: 1.5;
-      z-index: 10;
       box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+      pointer-events: none;
+    }
+
+    .message {
+      position: absolute;
+      left: 20px;
+      bottom: 20px;
+      color: #666;
+      font-size: 13px;
+      z-index: 10;
     }
 
     .footer {
@@ -98,44 +148,98 @@
       color: #666;
       font-size: 11px;
       margin-top: 8px;
+      padding-bottom: 24px;
     }
 
-    #chart a,
+    #priceChart a,
+    #volumeChart a,
     .tv-lightweight-charts a {
       display: none !important;
       opacity: 0 !important;
       pointer-events: none !important;
     }
+
+    @media (max-width: 600px) {
+      .app {
+        padding: 10px;
+      }
+
+      .header {
+        padding: 14px 16px;
+      }
+
+      .name {
+        font-size: 21px;
+      }
+
+      .price {
+        font-size: 38px;
+      }
+
+      .change {
+        font-size: 16px;
+      }
+
+      .tab {
+        padding: 11px;
+        font-size: 15px;
+      }
+
+      .price-chart-wrap {
+        height: 360px;
+      }
+
+      .volume-chart-wrap {
+        height: 110px;
+      }
+
+      .ma-box {
+        top: 12px;
+        left: 12px;
+        font-size: 11px;
+      }
+    }
   </style>
 </head>
 
 <body>
-  <div class="container">
-    <div class="header">
-      <div class="name" id="name">---</div>
-      <div class="price" id="price">---</div>
-      <div class="industry" id="industry">---</div>
+<div class="app">
+  <div class="header">
+    <div class="name" id="companyName">---</div>
+    <div class="price-row">
+      <div class="price" id="currentPrice">---</div>
+      <div class="change" id="changeText">---</div>
     </div>
-
-    <div class="tabs">
-      <div class="tab active">日足</div>
-    </div>
-
-    <div class="chart-wrap">
-      <div class="ma-box" id="maBox">読み込み中...</div>
-      <div id="chart"></div>
-      <div class="message" id="message"></div>
-    </div>
-
-    <div class="footer">※ 投資クン内の学習用仮想チャートです</div>
+    <div class="industry" id="industryLabel">---</div>
   </div>
+
+  <div class="tabs">
+    <button class="tab active" data-mode="day">日足</button>
+    <button class="tab" data-mode="week">週足</button>
+    <button class="tab" data-mode="month">月足</button>
+  </div>
+
+  <div class="chart-card">
+    <div class="price-chart-wrap">
+      <div class="ma-box" id="maBox">読み込み中...</div>
+      <div class="message" id="message"></div>
+      <div id="priceChart"></div>
+    </div>
+
+    <div class="volume-chart-wrap">
+      <div id="volumeChart"></div>
+    </div>
+  </div>
+
+  <div class="footer">※ 投資クン内の学習用仮想チャートです</div>
+</div>
 
 <script>
 const params = new URLSearchParams(location.search);
 
 const companyName = params.get("name") || "";
 const industry = params.get("industry") || "";
-const price = Number(params.get("price") || 0);
+const urlPrice = Number(params.get("price") || 0);
 
 const SUPABASE_URL = "https://ddtszhkycoqnffgciucl.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdHN6aGt5Y29xbmZmZ2NpdWNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMDExODQsImV4cCI6MjA2NDU3NzE4NH0.hASl_SDEf86hISajh9WQ0o5kVTuWZCV7IJ7y363cN9c";
@@ -154,49 +258,32 @@ const INDUSTRY_LABELS = {
   real_estate: "不動産"
 };
 
-document.getElementById("name").innerText = companyName || "企業名なし";
-document.getElementById("price").innerText = price ? price.toLocaleString("ja-JP") : "---";
-document.getElementById("industry").innerText = INDUSTRY_LABELS[industry] || industry || "---";
+let rawDailyData = [];
 
-function showMessage(text) {
-  document.getElementById("message").innerText = text;
+let priceChart = null;
+let volumeChart = null;
+
+let isSyncingRange = false;
+
+document.getElementById("companyName").textContent = companyName || "企業名なし";
+document.getElementById("currentPrice").textContent =
+  urlPrice ? Math.round(urlPrice).toLocaleString("ja-JP") : "---";
+document.getElementById("industryLabel").textContent =
+  INDUSTRY_LABELS[industry] || industry || "---";
+
+function formatPrice(v) {
+  return Math.round(Number(v)).toLocaleString("ja-JP");
 }
 
-function movingAverage(rows, period) {
-  const result = [];
-  let sum = 0;
-  const queue = [];
-
-  for (const row of rows) {
-    queue.push(row.close);
-    sum += row.close;
-
-    if (queue.length > period) {
-      sum -= queue.shift();
-    }
-
-    if (queue.length === period) {
-      result.push({
-        time: row.time,
-        value: Number((sum / period).toFixed(2))
-      });
-    }
-  }
-
-  return result;
+function showMessage(text) {
+  document.getElementById("message").textContent = text;
 }
 
 async function fetchDailyData() {
-  if (!companyName) {
-    throw new Error("URLにnameがありません");
-  }
-
   const url =
     `${SUPABASE_URL}/rest/v1/company_daily_ohlcv` +
     `?company_name=eq.${encodeURIComponent(companyName)}` +
     `&order=date.asc`;
-
-  console.log("fetch url:", url);
 
   const res = await fetch(url, {
     headers: {
@@ -207,14 +294,13 @@ async function fetchDailyData() {
   });
 
   const json = await res.json();
-  console.log("取得データ:", json);
 
   if (!res.ok) {
     throw new Error(JSON.stringify(json));
   }
 
   if (!Array.isArray(json) || json.length === 0) {
-    throw new Error("該当企業の日足データがありません");
+    throw new Error("日足データがありません");
   }
 
   return json.map(d => ({
@@ -233,136 +319,335 @@ async function fetchDailyData() {
   );
 }
 
-async function initChart() {
-  try {
-    showMessage("");
+function weekStart(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
 
-    const data = await fetchDailyData();
+function monthStart(dateStr) {
+  return dateStr.slice(0, 7) + "-01";
+}
 
-    const chartEl = document.getElementById("chart");
+function aggregate(rows, mode) {
+  if (mode === "day") return rows;
 
-    const chart = LightweightCharts.createChart(chartEl, {
-      width: chartEl.clientWidth,
-      height: 460,
-      layout: {
-        background: { color: "#ffffff" },
-        textColor: "#111827"
-      },
-      watermark: {
-        visible: false
-      },
-      grid: {
-        vertLines: { color: "#edf0f5" },
-        horzLines: { color: "#edf0f5" }
-      },
-      rightPriceScale: {
-        borderColor: "#ddd"
-      },
+  const groups = new Map();
+
+  for (const r of rows) {
+    const key = mode === "week" ? weekStart(r.time) : monthStart(r.time);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+
+  const out = [];
+
+  for (const [key, arr] of groups) {
+    out.push({
+      time: key,
+      open: arr[0].open,
+      high: Math.max(...arr.map(x => x.high)),
+      low: Math.min(...arr.map(x => x.low)),
+      close: arr[arr.length - 1].close,
+      volume: arr.reduce((s, x) => s + x.volume, 0)
+    });
+  }
+
+  return out;
+}
+
+function movingAverage(rows, period) {
+  const out = [];
+  const q = [];
+  let sum = 0;
+
+  for (const r of rows) {
+    q.push(r.close);
+    sum += r.close;
+
+    if (q.length > period) {
+      sum -= q.shift();
+    }
+
+    if (q.length === period) {
+      out.push({
+        time: r.time,
+        value: Number((sum / period).toFixed(2))
+      });
+    }
+  }
+
+  return out;
+}
+
+function maPeriods(mode) {
+  if (mode === "day") return [5, 25, 75];
+  if (mode === "week") return [13, 26, 52];
+  return [6, 12, 24];
+}
+
+function updateHeader(data) {
+  if (data.length < 2) return;
+
+  const last = data[data.length - 1];
+  const prev = data[data.length - 2];
+
+  const diff = last.close - prev.close;
+  const rate = diff / prev.close * 100;
+
+  document.getElementById("currentPrice").textContent = formatPrice(last.close);
+
+  const changeEl = document.getElementById("changeText");
+  changeEl.textContent =
+    `${diff >= 0 ? "+" : ""}${diff.toFixed(0)} / ${rate.toFixed(2)}%`;
+  changeEl.className = "change " + (diff >= 0 ? "up" : "down");
+}
+
+function getCommonChartOptions(width, height, showTimeScale) {
+  return {
+    width,
+    height,
+    layout: {
+      background: { color: "#ffffff" },
+      textColor: "#111827"
+    },
+    watermark: {
+      visible: false
+    },
+    grid: {
+      vertLines: { color: "#edf0f5" },
+      horzLines: { color: "#edf0f5" }
+    },
+    rightPriceScale: {
+      borderColor: "#ddd"
+    },
+    timeScale: {
+      borderColor: "#ddd",
+      timeVisible: false,
+      rightOffset: 8,
+      visible: showTimeScale
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal
+    },
+
+    // 重要：
+    // 1本指の上下スクロールを邪魔しないように、ドラッグ操作でのチャート移動を止める
+    // 拡大縮小は2本指ピンチのみ許可
+    handleScroll: {
+      mouseWheel: false,
+      pressedMouseMove: false,
+      horzTouchDrag: false,
+      vertTouchDrag: false
+    },
+    handleScale: {
+      axisPressedMouseMove: false,
+      mouseWheel: false,
+      pinch: true
+    }
+  };
+}
+
+function syncTimeScales() {
+  if (!priceChart || !volumeChart) return;
+
+  const priceTimeScale = priceChart.timeScale();
+  const volumeTimeScale = volumeChart.timeScale();
+
+  priceTimeScale.subscribeVisibleLogicalRangeChange(range => {
+    if (isSyncingRange || !range) return;
+    isSyncingRange = true;
+    volumeTimeScale.setVisibleLogicalRange(range);
+    isSyncingRange = false;
+  });
+
+  volumeTimeScale.subscribeVisibleLogicalRangeChange(range => {
+    if (isSyncingRange || !range) return;
+    isSyncingRange = true;
+    priceTimeScale.setVisibleLogicalRange(range);
+    isSyncingRange = false;
+  });
+}
+
+function render(mode) {
+  const data = aggregate(rawDailyData, mode);
+
+  updateHeader(data);
+
+  if (priceChart) {
+    priceChart.remove();
+    priceChart = null;
+  }
+
+  if (volumeChart) {
+    volumeChart.remove();
+    volumeChart = null;
+  }
+
+  const priceChartEl = document.getElementById("priceChart");
+  const volumeChartEl = document.getElementById("volumeChart");
+
+  const priceWrap = document.querySelector(".price-chart-wrap");
+  const volumeWrap = document.querySelector(".volume-chart-wrap");
+
+  const barSpacing = mode === "day" ? 8 : mode === "week" ? 10 : 12;
+
+  priceChart = LightweightCharts.createChart(
+    priceChartEl,
+    {
+      ...getCommonChartOptions(
+        priceChartEl.clientWidth,
+        priceWrap.clientHeight,
+        false
+      ),
       timeScale: {
         borderColor: "#ddd",
         timeVisible: false,
         rightOffset: 8,
-        barSpacing: 8
+        barSpacing,
+        visible: false
+      }
+    }
+  );
+
+  volumeChart = LightweightCharts.createChart(
+    volumeChartEl,
+    {
+      ...getCommonChartOptions(
+        volumeChartEl.clientWidth,
+        volumeWrap.clientHeight,
+        true
+      ),
+      timeScale: {
+        borderColor: "#ddd",
+        timeVisible: false,
+        rightOffset: 8,
+        barSpacing,
+        visible: true
       },
-      crosshair: {
-        mode: LightweightCharts.CrosshairMode.Normal
+      rightPriceScale: {
+        borderColor: "#ddd",
+        scaleMargins: {
+          top: 0.15,
+          bottom: 0.05
+        }
       }
-    });
+    }
+  );
 
-    const candleSeries = chart.addCandlestickSeries({
-      upColor: "#d93025",
-      downColor: "#1a73e8",
-      borderUpColor: "#d93025",
-      borderDownColor: "#1a73e8",
-      wickUpColor: "#d93025",
-      wickDownColor: "#1a73e8"
-    });
+  const candleSeries = priceChart.addCandlestickSeries({
+    upColor: "#d93025",
+    downColor: "#1a73e8",
+    borderUpColor: "#d93025",
+    borderDownColor: "#1a73e8",
+    wickUpColor: "#d93025",
+    wickDownColor: "#1a73e8"
+  });
 
-    candleSeries.setData(data.map(d => ({
-      time: d.time,
-      open: d.open,
-      high: d.high,
-      low: d.low,
-      close: d.close
-    })));
+  candleSeries.setData(data.map(d => ({
+    time: d.time,
+    open: d.open,
+    high: d.high,
+    low: d.low,
+    close: d.close
+  })));
 
-    const volumeSeries = chart.addHistogramSeries({
-      priceFormat: { type: "volume" },
-      priceScaleId: "",
-      scaleMargins: {
-        top: 0.78,
-        bottom: 0
-      }
-    });
+  const volumeSeries = volumeChart.addHistogramSeries({
+    priceFormat: { type: "volume" },
+    priceLineVisible: false
+  });
 
-    volumeSeries.setData(data.map(d => ({
-      time: d.time,
-      value: d.volume,
-      color: d.close >= d.open
-        ? "rgba(217,48,37,0.42)"
-        : "rgba(26,115,232,0.42)"
-    })));
+  volumeSeries.setData(data.map(d => ({
+    time: d.time,
+    value: d.volume,
+    color: d.close >= d.open
+      ? "rgba(217,48,37,0.42)"
+      : "rgba(26,115,232,0.42)"
+  })));
 
-    const ma5 = movingAverage(data, 5);
-    const ma25 = movingAverage(data, 25);
-    const ma75 = movingAverage(data, 75);
+  const periods = maPeriods(mode);
+  const colors = ["#d81bdb", "#1ecb4f", "#4f7edb"];
+  const maBox = document.getElementById("maBox");
 
-    const ma5Series = chart.addLineSeries({
-      color: "#d81bdb",
+  maBox.innerHTML = `<b>単純移動平均</b><br>`;
+
+  periods.forEach((p, i) => {
+    const ma = movingAverage(data, p);
+
+    const s = priceChart.addLineSeries({
+      color: colors[i],
       lineWidth: 2,
       priceLineVisible: false
     });
 
-    const ma25Series = chart.addLineSeries({
-      color: "#1ecb4f",
-      lineWidth: 2,
-      priceLineVisible: false
-    });
+    s.setData(ma);
 
-    const ma75Series = chart.addLineSeries({
-      color: "#4f7edb",
-      lineWidth: 2,
-      priceLineVisible: false
-    });
+    const latest = ma[ma.length - 1]?.value;
 
-    ma5Series.setData(ma5);
-    ma25Series.setData(ma25);
-    ma75Series.setData(ma75);
+    maBox.innerHTML +=
+      `<span style="color:${colors[i]}">MA${p}</span> ` +
+      `${latest ? latest.toLocaleString("ja-JP") : "-"}<br>`;
+  });
 
-    const latestMa5 = ma5[ma5.length - 1]?.value;
-    const latestMa25 = ma25[ma25.length - 1]?.value;
-    const latestMa75 = ma75[ma75.length - 1]?.value;
+  syncTimeScales();
 
-    document.getElementById("maBox").innerHTML = `
-      <b>単純移動平均</b><br>
-      <span style="color:#d81bdb">MA5</span> ${latestMa5 ? latestMa5.toLocaleString("ja-JP") : "-"}<br>
-      <span style="color:#1ecb4f">MA25</span> ${latestMa25 ? latestMa25.toLocaleString("ja-JP") : "-"}<br>
-      <span style="color:#4f7edb">MA75</span> ${latestMa75 ? latestMa75.toLocaleString("ja-JP") : "-"}
-    `;
+  const visibleCount =
+    mode === "day" ? 120 :
+    mode === "week" ? 80 :
+    48;
 
-    const last = data[data.length - 1];
-    document.getElementById("price").innerText =
-      Math.round(last.close).toLocaleString("ja-JP");
+  const range = {
+    from: Math.max(data.length - visibleCount, 0),
+    to: data.length + 6
+  };
 
-    chart.timeScale().setVisibleLogicalRange({
-      from: Math.max(data.length - 120, 0),
-      to: data.length + 8
-    });
+  priceChart.timeScale().setVisibleLogicalRange(range);
+  volumeChart.timeScale().setVisibleLogicalRange(range);
 
-    window.addEventListener("resize", () => {
-      chart.applyOptions({
-        width: chartEl.clientWidth
-      });
-    });
-
-  } catch (error) {
-    console.error(error);
-    document.getElementById("maBox").innerHTML = "";
-    showMessage("チャートデータを取得できませんでした: " + error.message);
-  }
+  showMessage("");
 }
 
-initChart();
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    render(btn.dataset.mode);
+  });
+});
+
+window.addEventListener("resize", () => {
+  const priceChartEl = document.getElementById("priceChart");
+  const volumeChartEl = document.getElementById("volumeChart");
+  const priceWrap = document.querySelector(".price-chart-wrap");
+  const volumeWrap = document.querySelector(".volume-chart-wrap");
+
+  if (priceChart) {
+    priceChart.applyOptions({
+      width: priceChartEl.clientWidth,
+      height: priceWrap.clientHeight
+    });
+  }
+
+  if (volumeChart) {
+    volumeChart.applyOptions({
+      width: volumeChartEl.clientWidth,
+      height: volumeWrap.clientHeight
+    });
+  }
+});
+
+(async function init() {
+  try {
+    rawDailyData = await fetchDailyData();
+    render("day");
+  } catch (e) {
+    console.error(e);
+    document.getElementById("maBox").innerHTML = "";
+    showMessage("チャートデータを取得できませんでした: " + e.message);
+  }
+})();
 </script>
 </body>
 </html>
