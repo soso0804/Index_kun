@@ -1,105 +1,368 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8" />
-<title>Stock Chart</title>
-<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Chart</title>
 
-<style>
-body { font-family: sans-serif; margin: 0; background: #f7f7f7; }
-.container { padding: 16px; }
-.header { background: #fff; padding: 16px; border-radius: 12px; }
-.tabs { display: flex; gap: 8px; margin-top: 12px; }
-.tab { padding: 10px; border-radius: 8px; background: #ddd; cursor: pointer; }
-.active { background: #111; color: #fff; }
-#chart { height: 400px; margin-top: 12px; background: #fff; border-radius: 12px; }
-</style>
+  <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      background: #f7f7f7;
+      color: #111;
+    }
+
+    .container {
+      padding: 16px;
+    }
+
+    .header {
+      background: #fff;
+      padding: 16px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+
+    .name {
+      font-size: 24px;
+      font-weight: 800;
+    }
+
+    .price {
+      font-size: 36px;
+      font-weight: 900;
+      margin-top: 4px;
+    }
+
+    .industry {
+      font-size: 13px;
+      color: #555;
+      margin-top: 4px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .tab {
+      padding: 10px 16px;
+      border-radius: 8px;
+      background: #ddd;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      background: #111;
+      color: #fff;
+    }
+
+    .chart-wrap {
+      position: relative;
+      background: #fff;
+      border-radius: 12px;
+      padding: 8px;
+    }
+
+    #chart {
+      height: 460px;
+      width: 100%;
+    }
+
+    .message {
+      padding: 16px;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .ma-box {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      background: rgba(255,255,255,0.92);
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.5;
+      z-index: 10;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+    }
+
+    .footer {
+      text-align: center;
+      color: #666;
+      font-size: 11px;
+      margin-top: 8px;
+    }
+
+    #chart a,
+    .tv-lightweight-charts a {
+      display: none !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+  </style>
 </head>
 
 <body>
-<div class="container">
-  <div class="header">
-    <div id="name"></div>
-    <div id="price"></div>
-    <div id="industry"></div>
-  </div>
+  <div class="container">
+    <div class="header">
+      <div class="name" id="name">---</div>
+      <div class="price" id="price">---</div>
+      <div class="industry" id="industry">---</div>
+    </div>
 
-  <div class="tabs">
-    <div class="tab active">日足</div>
-  </div>
+    <div class="tabs">
+      <div class="tab active">日足</div>
+    </div>
 
-  <div id="chart"></div>
-</div>
+    <div class="chart-wrap">
+      <div class="ma-box" id="maBox">読み込み中...</div>
+      <div id="chart"></div>
+      <div class="message" id="message"></div>
+    </div>
+
+    <div class="footer">※ 投資クン内の学習用仮想チャートです</div>
+  </div>
 
 <script>
-// ==========================
-// URL取得
-// ==========================
 const params = new URLSearchParams(location.search);
-const name = params.get("name");
-const industry = params.get("industry");
-const price = Number(params.get("price"));
 
-// 表示
-document.getElementById("name").innerText = name;
-document.getElementById("price").innerText = price;
-document.getElementById("industry").innerText = industry;
+const companyName = params.get("name") || "";
+const industry = params.get("industry") || "";
+const price = Number(params.get("price") || 0);
 
-// ==========================
-// Supabase
-// ==========================
 const SUPABASE_URL = "https://ddtszhkycoqnffgciucl.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdHN6aGt5Y29xbmZmZ2NpdWNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMDExODQsImV4cCI6MjA2NDU3NzE4NH0.hASl_SDEf86hISajh9WQ0o5kVTuWZCV7IJ7y363cN9c";
 
-// ==========================
-// データ取得
-// ==========================
-async function fetchData() {
-  const url = `${SUPABASE_URL}/rest/v1/company_daily_ohlcv?company_name=eq.${encodeURIComponent(name)}&order=date.asc`;
+const INDUSTRY_LABELS = {
+  energy_infra: "エネルギー・インフラ",
+  materials_resources: "素材・資源",
+  auto_mobility: "自動車・モビリティー",
+  makers_machinery: "メーカー・産業機械",
+  daily_goods: "生活必需品",
+  healthcare_bio: "ヘルスケア・バイオ",
+  finance: "金融",
+  it_digital: "IT・デジタル",
+  food_restaurant: "小売・外食",
+  tourism_leisure: "観光・レジャー",
+  real_estate: "不動産"
+};
+
+document.getElementById("name").innerText = companyName || "企業名なし";
+document.getElementById("price").innerText = price ? price.toLocaleString("ja-JP") : "---";
+document.getElementById("industry").innerText = INDUSTRY_LABELS[industry] || industry || "---";
+
+function showMessage(text) {
+  document.getElementById("message").innerText = text;
+}
+
+function movingAverage(rows, period) {
+  const result = [];
+  let sum = 0;
+  const queue = [];
+
+  for (const row of rows) {
+    queue.push(row.close);
+    sum += row.close;
+
+    if (queue.length > period) {
+      sum -= queue.shift();
+    }
+
+    if (queue.length === period) {
+      result.push({
+        time: row.time,
+        value: Number((sum / period).toFixed(2))
+      });
+    }
+  }
+
+  return result;
+}
+
+async function fetchDailyData() {
+  if (!companyName) {
+    throw new Error("URLにnameがありません");
+  }
+
+  const url =
+    `${SUPABASE_URL}/rest/v1/company_daily_ohlcv` +
+    `?company_name=eq.${encodeURIComponent(companyName)}` +
+    `&order=date.asc`;
+
+  console.log("fetch url:", url);
 
   const res = await fetch(url, {
     headers: {
       apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      Accept: "application/json"
     }
   });
 
-  const data = await res.json();
+  const json = await res.json();
+  console.log("取得データ:", json);
 
-  return data.map(d => ({
+  if (!res.ok) {
+    throw new Error(JSON.stringify(json));
+  }
+
+  if (!Array.isArray(json) || json.length === 0) {
+    throw new Error("該当企業の日足データがありません");
+  }
+
+  return json.map(d => ({
     time: d.date,
-    open: d.open,
-    high: d.high,
-    low: d.low,
-    close: d.close
-  }));
+    open: Number(d.open),
+    high: Number(d.high),
+    low: Number(d.low),
+    close: Number(d.close),
+    volume: Number(d.volume || 0)
+  })).filter(d =>
+    d.time &&
+    Number.isFinite(d.open) &&
+    Number.isFinite(d.high) &&
+    Number.isFinite(d.low) &&
+    Number.isFinite(d.close)
+  );
 }
 
-// ==========================
-// チャート
-// ==========================
-async function init() {
-  const data = await fetchData();
+async function initChart() {
+  try {
+    showMessage("");
 
-  const chart = LightweightCharts.createChart(document.getElementById("chart"), {
-    layout: { background: { color: "#fff" }, textColor: "#000" },
-    grid: { vertLines: { color: "#eee" }, horzLines: { color: "#eee" } }
-  });
+    const data = await fetchDailyData();
 
-  const candle = chart.addCandlestickSeries({
-    upColor: "#e53935",
-    downColor: "#1e88e5",
-    borderVisible: false,
-    wickUpColor: "#e53935",
-    wickDownColor: "#1e88e5"
-  });
+    const chartEl = document.getElementById("chart");
 
-  candle.setData(data);
+    const chart = LightweightCharts.createChart(chartEl, {
+      width: chartEl.clientWidth,
+      height: 460,
+      layout: {
+        background: { color: "#ffffff" },
+        textColor: "#111827"
+      },
+      watermark: {
+        visible: false
+      },
+      grid: {
+        vertLines: { color: "#edf0f5" },
+        horzLines: { color: "#edf0f5" }
+      },
+      rightPriceScale: {
+        borderColor: "#ddd"
+      },
+      timeScale: {
+        borderColor: "#ddd",
+        timeVisible: false,
+        rightOffset: 8,
+        barSpacing: 8
+      },
+      crosshair: {
+        mode: LightweightCharts.CrosshairMode.Normal
+      }
+    });
 
-  chart.timeScale().fitContent();
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: "#d93025",
+      downColor: "#1a73e8",
+      borderUpColor: "#d93025",
+      borderDownColor: "#1a73e8",
+      wickUpColor: "#d93025",
+      wickDownColor: "#1a73e8"
+    });
+
+    candleSeries.setData(data.map(d => ({
+      time: d.time,
+      open: d.open,
+      high: d.high,
+      low: d.low,
+      close: d.close
+    })));
+
+    const volumeSeries = chart.addHistogramSeries({
+      priceFormat: { type: "volume" },
+      priceScaleId: "",
+      scaleMargins: {
+        top: 0.78,
+        bottom: 0
+      }
+    });
+
+    volumeSeries.setData(data.map(d => ({
+      time: d.time,
+      value: d.volume,
+      color: d.close >= d.open
+        ? "rgba(217,48,37,0.42)"
+        : "rgba(26,115,232,0.42)"
+    })));
+
+    const ma5 = movingAverage(data, 5);
+    const ma25 = movingAverage(data, 25);
+    const ma75 = movingAverage(data, 75);
+
+    const ma5Series = chart.addLineSeries({
+      color: "#d81bdb",
+      lineWidth: 2,
+      priceLineVisible: false
+    });
+
+    const ma25Series = chart.addLineSeries({
+      color: "#1ecb4f",
+      lineWidth: 2,
+      priceLineVisible: false
+    });
+
+    const ma75Series = chart.addLineSeries({
+      color: "#4f7edb",
+      lineWidth: 2,
+      priceLineVisible: false
+    });
+
+    ma5Series.setData(ma5);
+    ma25Series.setData(ma25);
+    ma75Series.setData(ma75);
+
+    const latestMa5 = ma5[ma5.length - 1]?.value;
+    const latestMa25 = ma25[ma25.length - 1]?.value;
+    const latestMa75 = ma75[ma75.length - 1]?.value;
+
+    document.getElementById("maBox").innerHTML = `
+      <b>単純移動平均</b><br>
+      <span style="color:#d81bdb">MA5</span> ${latestMa5 ? latestMa5.toLocaleString("ja-JP") : "-"}<br>
+      <span style="color:#1ecb4f">MA25</span> ${latestMa25 ? latestMa25.toLocaleString("ja-JP") : "-"}<br>
+      <span style="color:#4f7edb">MA75</span> ${latestMa75 ? latestMa75.toLocaleString("ja-JP") : "-"}
+    `;
+
+    const last = data[data.length - 1];
+    document.getElementById("price").innerText =
+      Math.round(last.close).toLocaleString("ja-JP");
+
+    chart.timeScale().setVisibleLogicalRange({
+      from: Math.max(data.length - 120, 0),
+      to: data.length + 8
+    });
+
+    window.addEventListener("resize", () => {
+      chart.applyOptions({
+        width: chartEl.clientWidth
+      });
+    });
+
+  } catch (error) {
+    console.error(error);
+    document.getElementById("maBox").innerHTML = "";
+    showMessage("チャートデータを取得できませんでした: " + error.message);
+  }
 }
 
-init();
+initChart();
 </script>
 </body>
 </html>
