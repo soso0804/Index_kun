@@ -13,38 +13,39 @@
       background: #f5f7fa;
       color: #111;
     }
-    .app {
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 12px;
-    }
+    .app { max-width: 960px; margin: 0 auto; padding: 12px; }
     .header {
       background: #fff;
       border-radius: 14px;
       padding: 14px 16px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      box-shadow: 0 2px 10px rgba(0,0,0,.08);
       margin-bottom: 10px;
     }
-    .name {
-      font-size: 22px;
+    .top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .name { font-size: 22px; font-weight: 800; }
+    .industry-badge {
+      font-size: 12px;
       font-weight: 700;
-      margin-bottom: 6px;
+      background: #eef2f7;
+      color: #334155;
+      padding: 6px 10px;
+      border-radius: 999px;
+      white-space: nowrap;
     }
     .price-row {
       display: flex;
       align-items: flex-end;
       gap: 12px;
       flex-wrap: wrap;
+      margin-top: 6px;
     }
-    .price {
-      font-size: 36px;
-      font-weight: 800;
-      line-height: 1;
-    }
-    .change {
-      font-size: 18px;
-      font-weight: 700;
-    }
+    .price { font-size: 36px; font-weight: 900; line-height: 1; }
+    .change { font-size: 18px; font-weight: 800; }
     .up { color: #d93025; }
     .down { color: #1a73e8; }
     .tabs {
@@ -56,45 +57,44 @@
     .tab {
       border: none;
       border-radius: 10px;
-      padding: 10px;
+      padding: 11px;
       background: #e9eef5;
       font-size: 15px;
-      font-weight: 700;
+      font-weight: 800;
       cursor: pointer;
     }
     .tab.active {
       background: #111827;
       color: #fff;
+      box-shadow: inset 0 0 0 2px #1677ff;
     }
     .chart-card {
       position: relative;
       background: #fff;
       border-radius: 14px;
       padding: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      box-shadow: 0 2px 10px rgba(0,0,0,.08);
+      overflow: hidden;
     }
-    #chart {
-      width: 100%;
-      height: 520px;
-    }
+    #chart { width: 100%; height: 540px; }
     .ma-box {
       position: absolute;
       top: 18px;
       left: 18px;
-      background: rgba(255,255,255,0.9);
+      background: rgba(255,255,255,.93);
       border-radius: 8px;
       padding: 8px 10px;
       font-size: 12px;
-      line-height: 1.4;
+      line-height: 1.45;
       z-index: 10;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+      box-shadow: 0 1px 6px rgba(0,0,0,.12);
     }
     .tooltip {
       position: absolute;
       display: none;
       pointer-events: none;
       z-index: 20;
-      background: rgba(17,24,39,0.92);
+      background: rgba(17,24,39,.92);
       color: #fff;
       padding: 8px 10px;
       border-radius: 8px;
@@ -110,10 +110,14 @@
     }
   </style>
 </head>
+
 <body>
 <div class="app">
   <div class="header">
-    <div class="name" id="companyName">---</div>
+    <div class="top-row">
+      <div class="name" id="companyName">---</div>
+      <div class="industry-badge" id="industryLabel">---</div>
+    </div>
     <div class="price-row">
       <div class="price" id="currentPrice">---</div>
       <div class="change" id="changeText">---</div>
@@ -144,31 +148,50 @@ const industry = params.get("industry") || "it_digital";
 const currentPrice = Number(params.get("price") || 1000);
 const days = Number(params.get("days") || 180);
 
+const INDUSTRY_LABELS = {
+  energy_infra: "エネルギー・インフラ",
+  materials_resources: "素材・資源",
+  auto_mobility: "自動車・モビリティー",
+  makers_machinery: "メーカー・産業機械",
+  daily_goods: "生活必需品",
+  healthcare_bio: "ヘルスケア・バイオ",
+  finance: "金融",
+  it_digital: "IT・デジタル",
+  food_restaurant: "小売・外食",
+  tourism_leisure: "観光・レジャー",
+  real_estate: "不動産"
+};
+
 document.getElementById("companyName").textContent = companyName;
 document.getElementById("currentPrice").textContent = formatPrice(currentPrice);
+document.getElementById("industryLabel").textContent = INDUSTRY_LABELS[industry] || industry;
 
 const INDUSTRY = {
-  energy_infra:       { vol: 0.008, trend: 0.00010, beta: 0.55 },
-  materials_resources:{ vol: 0.016, trend: 0.00012, beta: 1.05 },
-  auto_mobility:      { vol: 0.018, trend: 0.00013, beta: 1.10 },
-  makers_machinery:   { vol: 0.015, trend: 0.00012, beta: 1.00 },
-  daily_goods:        { vol: 0.007, trend: 0.00008, beta: 0.45 },
-  healthcare_bio:     { vol: 0.022, trend: 0.00016, beta: 0.85 },
-  finance:            { vol: 0.018, trend: 0.00010, beta: 1.25 },
-  it_digital:          { vol: 0.024, trend: 0.00020, beta: 1.30 },
-  food_restaurant:    { vol: 0.013, trend: 0.00010, beta: 0.80 },
-  tourism_leisure:    { vol: 0.020, trend: 0.00014, beta: 1.10 },
-  real_estate:         { vol: 0.015, trend: 0.00009, beta: 1.00 }
+  energy_infra:        { vol: 0.008, trend: 0.00010, beta: 0.55 },
+  materials_resources: { vol: 0.016, trend: 0.00012, beta: 1.05 },
+  auto_mobility:       { vol: 0.018, trend: 0.00013, beta: 1.10 },
+  makers_machinery:    { vol: 0.015, trend: 0.00012, beta: 1.00 },
+  daily_goods:         { vol: 0.007, trend: 0.00008, beta: 0.45 },
+  healthcare_bio:      { vol: 0.022, trend: 0.00016, beta: 0.85 },
+  finance:             { vol: 0.018, trend: 0.00010, beta: 1.25 },
+  it_digital:           { vol: 0.024, trend: 0.00020, beta: 1.30 },
+  food_restaurant:     { vol: 0.013, trend: 0.00010, beta: 0.80 },
+  tourism_leisure:     { vol: 0.020, trend: 0.00014, beta: 1.10 },
+  real_estate:          { vol: 0.015, trend: 0.00009, beta: 1.00 }
 };
 
 const baseSeed = hashString(companyName + "_" + industry);
 const industryParam = INDUSTRY[industry] || INDUSTRY.it_digital;
 
 let chart;
-let candleSeries;
-let volumeSeries;
-let maSeries = [];
 let currentMode = "5m";
+
+function todayJST() {
+  const now = new Date();
+  const jst = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+  jst.setHours(0,0,0,0);
+  return jst;
+}
 
 function hashString(str) {
   let h = 2166136261;
@@ -195,7 +218,7 @@ function formatPrice(v) {
 }
 
 function dateStr(d) {
-  return d.toISOString().slice(0,10);
+  return d.toISOString().slice(0, 10);
 }
 
 function addDays(d, n) {
@@ -211,7 +234,7 @@ function isBusinessDay(d) {
 
 function makeBusinessDays(count) {
   const out = [];
-  let d = addDays(new Date(), -Math.ceil(count * 1.7));
+  let d = addDays(todayJST(), -Math.ceil(count * 1.7));
   while (out.length < count) {
     if (isBusinessDay(d)) out.push(new Date(d));
     d = addDays(d, 1);
@@ -220,7 +243,7 @@ function makeBusinessDays(count) {
 }
 
 function generateDaily(count) {
-  const dates = makeBusinessDays(Math.max(count, 260));
+  const dates = makeBusinessDays(Math.max(count, 700));
   let price = 800 + (baseSeed % 2500);
   const rows = [];
 
@@ -236,8 +259,7 @@ function generateDaily(count) {
       Math.sin(i / 28 + (hashString(industry) % 20)) * industryParam.vol * 0.25 +
       normal(key + 2) * industryParam.vol * 0.35;
 
-    const companyMove =
-      normal(key + 3) * industryParam.vol * 0.32;
+    const companyMove = normal(key + 3) * industryParam.vol * 0.32;
 
     let eventMove = 0;
     const e = rand(key + 4);
@@ -256,12 +278,11 @@ function generateDaily(count) {
     const high = Math.max(open, close) * (1 + Math.abs(normal(key + 7)) * 0.006);
     const low = Math.min(open, close) * (1 - Math.abs(normal(key + 8)) * 0.006);
 
-    const volume =
-      Math.round(
-        (50000 + (baseSeed % 500000)) *
-        (1 + Math.abs(ret) * 35) *
-        (0.75 + rand(key + 9) * 0.7)
-      );
+    const volume = Math.round(
+      (50000 + (baseSeed % 500000)) *
+      (1 + Math.abs(ret) * 35) *
+      (0.75 + rand(key + 9) * 0.7)
+    );
 
     rows.push({
       time: dateStr(d),
@@ -279,36 +300,41 @@ function generateDaily(count) {
 }
 
 function generateFiveMinute() {
-  const count = 78;
-  const today = new Date();
+  const today = todayJST();
+
+  // 横にスクロールしても途切れないように、直近5営業日分を作る
+  const tradingDays = makeBusinessDays(5);
   const rows = [];
-  let price = currentPrice * (0.995 + rand(baseSeed + 11) * 0.01);
+  let price = currentPrice * (0.985 + rand(baseSeed + 111) * 0.03);
 
-  for (let i = 0; i < count; i++) {
-    const key = hashString(baseSeed + "_5m_" + i + "_" + dateStr(today));
-    const ret =
-      normal(key) * industryParam.vol * 0.07 +
-      Math.sin(i / 8) * 0.0005;
+  for (const day of tradingDays) {
+    for (let i = 0; i < 78; i++) {
+      const key = hashString(baseSeed + "_5m_" + dateStr(day) + "_" + i);
 
-    const open = price;
-    const close = Math.max(80, open * (1 + ret));
-    const high = Math.max(open, close) * (1 + Math.abs(normal(key + 1)) * 0.0018);
-    const low = Math.min(open, close) * (1 - Math.abs(normal(key + 2)) * 0.0018);
+      const ret =
+        normal(key) * industryParam.vol * 0.065 +
+        Math.sin(i / 8) * 0.00045;
 
-    const t = new Date(today);
-    t.setHours(9, 0, 0, 0);
-    t.setMinutes(t.getMinutes() + i * 5);
+      const open = price;
+      const close = Math.max(80, open * (1 + ret));
+      const high = Math.max(open, close) * (1 + Math.abs(normal(key + 1)) * 0.0018);
+      const low = Math.min(open, close) * (1 - Math.abs(normal(key + 2)) * 0.0018);
 
-    rows.push({
-      time: Math.floor(t.getTime() / 1000),
-      open,
-      high,
-      low,
-      close,
-      volume: Math.round((1000 + baseSeed % 12000) * (1 + Math.abs(ret) * 180))
-    });
+      const t = new Date(day);
+      t.setHours(9, 0, 0, 0);
+      t.setMinutes(t.getMinutes() + i * 5);
 
-    price = close;
+      rows.push({
+        time: Math.floor(t.getTime() / 1000),
+        open,
+        high,
+        low,
+        close,
+        volume: Math.round((1000 + baseSeed % 12000) * (1 + Math.abs(ret) * 180))
+      });
+
+      price = close;
+    }
   }
 
   return scaleToCurrent(rows);
@@ -357,6 +383,7 @@ function aggregate(rows, mode) {
       volume: arr.reduce((s,x) => s + x.volume, 0)
     });
   }
+
   return out;
 }
 
@@ -375,6 +402,7 @@ function movingAverage(rows, n) {
       value: q.length === n ? +(sum / n).toFixed(2) : NaN
     });
   }
+
   return out;
 }
 
@@ -388,11 +416,11 @@ function getMA(mode) {
 function buildData(mode) {
   if (mode === "5m") return generateFiveMinute();
 
-  const daily = generateDaily(Math.max(days, 520));
+  const daily = generateDaily(Math.max(days, 700));
 
   if (mode === "1d") return daily.slice(-days);
-  if (mode === "1w") return aggregate(daily, "1w").slice(-80);
-  if (mode === "1mo") return aggregate(daily, "1mo").slice(-60);
+  if (mode === "1w") return aggregate(daily, "1w").slice(-120);
+  if (mode === "1mo") return aggregate(daily, "1mo").slice(-80);
 
   return daily;
 }
@@ -405,8 +433,8 @@ function render(mode) {
 
   const diff = last.close - prev.close;
   const rate = diff / prev.close * 100;
-  const changeEl = document.getElementById("changeText");
 
+  const changeEl = document.getElementById("changeText");
   changeEl.textContent = `${diff >= 0 ? "+" : ""}${diff.toFixed(0)} / ${rate.toFixed(2)}%`;
   changeEl.className = "change " + (diff >= 0 ? "up" : "down");
 
@@ -417,23 +445,26 @@ function render(mode) {
       background: { color: "#ffffff" },
       textColor: "#222"
     },
+    watermark: { visible: false },
+    attributionLogo: false,
     grid: {
       vertLines: { color: "#edf0f5" },
       horzLines: { color: "#edf0f5" }
     },
-    rightPriceScale: {
-      borderColor: "#ddd"
-    },
+    rightPriceScale: { borderColor: "#ddd" },
     timeScale: {
       borderColor: "#ddd",
-      timeVisible: mode === "5m"
+      timeVisible: mode === "5m",
+      secondsVisible: false,
+      rightOffset: 8,
+      barSpacing: mode === "5m" ? 8 : 7,
+      fixLeftEdge: false,
+      fixRightEdge: false
     },
-    crosshair: {
-      mode: LightweightCharts.CrosshairMode.Normal
-    }
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
   });
 
-  candleSeries = chart.addCandlestickSeries({
+  const candleSeries = chart.addCandlestickSeries({
     upColor: "#d93025",
     downColor: "#1a73e8",
     borderUpColor: "#d93025",
@@ -450,7 +481,7 @@ function render(mode) {
     close: r.close
   })));
 
-  volumeSeries = chart.addHistogramSeries({
+  const volumeSeries = chart.addHistogramSeries({
     priceFormat: { type: "volume" },
     priceScaleId: "",
     scaleMargins: { top: 0.78, bottom: 0 }
@@ -459,10 +490,9 @@ function render(mode) {
   volumeSeries.setData(data.map(r => ({
     time: r.time,
     value: r.volume,
-    color: r.close >= r.open ? "rgba(217,48,37,0.45)" : "rgba(26,115,232,0.45)"
+    color: r.close >= r.open ? "rgba(217,48,37,0.42)" : "rgba(26,115,232,0.42)"
   })));
 
-  maSeries = [];
   const maList = getMA(mode);
   const colors = ["#d81bdb", "#1ecb4f", "#4f7edb"];
   const maBox = document.getElementById("maBox");
@@ -474,15 +504,18 @@ function render(mode) {
       lineWidth: 2,
       priceLineVisible: false
     });
+
     const maData = movingAverage(data, n);
     s.setData(maData);
-    maSeries.push(s);
 
     const latest = [...maData].reverse().find(x => Number.isFinite(x.value));
     maBox.innerHTML += `<span style="color:${colors[idx]}">MA${idx+1}(${n})</span> ${latest ? latest.value.toLocaleString() : "-"}<br>`;
   });
 
-  chart.timeScale().fitContent();
+  chart.timeScale().setVisibleLogicalRange({
+    from: Math.max(data.length - 90, 0),
+    to: data.length + 8
+  });
 
   const tooltip = document.getElementById("tooltip");
   chart.subscribeCrosshairMove(param => {
@@ -499,10 +532,12 @@ function render(mode) {
 
     tooltip.style.display = "block";
     tooltip.style.left = Math.min(param.point.x + 20, window.innerWidth - 190) + "px";
-    tooltip.style.top = (param.point.y + 20) + "px";
+    tooltip.style.top = param.point.y + 20 + "px";
 
     tooltip.innerHTML = `
-      <b>${typeof item.time === "number" ? new Date(item.time*1000).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}) : item.time}</b><br>
+      <b>${typeof item.time === "number"
+        ? new Date(item.time * 1000).toLocaleString("ja-JP", { month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" })
+        : item.time}</b><br>
       始 ${formatPrice(item.open)}<br>
       高 ${formatPrice(item.high)}<br>
       安 ${formatPrice(item.low)}<br>
@@ -521,9 +556,11 @@ document.querySelectorAll(".tab").forEach(btn => {
 });
 
 window.addEventListener("resize", () => {
-  if (chart) chart.applyOptions({
-    width: document.getElementById("chart").clientWidth
-  });
+  if (chart) {
+    chart.applyOptions({
+      width: document.getElementById("chart").clientWidth
+    });
+  }
 });
 
 render("5m");
