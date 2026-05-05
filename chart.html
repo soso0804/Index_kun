@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
   <title>投資クン チャート</title>
 
   <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
@@ -15,6 +15,7 @@
       background: #f5f6f8;
       color: #111827;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overscroll-behavior-y: auto;
     }
 
     .app {
@@ -97,15 +98,41 @@
       overflow: hidden;
     }
 
-    #chart {
+    .price-chart-wrap {
+      position: relative;
       width: 100%;
-      height: 520px;
+      height: 410px;
+
+      /*
+        横スワイプはチャート操作として使う。
+        縦方向はページスクロールを優先。
+      */
+      touch-action: pan-y pinch-zoom;
+    }
+
+    .volume-chart-wrap {
+      position: relative;
+      width: 100%;
+      height: 130px;
+      margin-top: 4px;
+      border-top: 1px solid #eef1f5;
+
+      /*
+        出来高側も横スクロールとピンチを許可。
+      */
+      touch-action: pan-y pinch-zoom;
+    }
+
+    #priceChart,
+    #volumeChart {
+      width: 100%;
+      height: 100%;
     }
 
     .ma-box {
       position: absolute;
-      top: 20px;
-      left: 20px;
+      top: 14px;
+      left: 14px;
       z-index: 10;
       background: rgba(255,255,255,0.94);
       border-radius: 8px;
@@ -113,6 +140,7 @@
       font-size: 12px;
       line-height: 1.5;
       box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+      pointer-events: none;
     }
 
     .message {
@@ -129,13 +157,56 @@
       color: #666;
       font-size: 11px;
       margin-top: 8px;
+      padding-bottom: 24px;
     }
 
-    #chart a,
+    #priceChart a,
+    #volumeChart a,
     .tv-lightweight-charts a {
       display: none !important;
       opacity: 0 !important;
       pointer-events: none !important;
+    }
+
+    @media (max-width: 600px) {
+      .app {
+        padding: 10px;
+      }
+
+      .header {
+        padding: 14px 16px;
+      }
+
+      .name {
+        font-size: 21px;
+      }
+
+      .price {
+        font-size: 38px;
+      }
+
+      .change {
+        font-size: 16px;
+      }
+
+      .tab {
+        padding: 11px;
+        font-size: 15px;
+      }
+
+      .price-chart-wrap {
+        height: 360px;
+      }
+
+      .volume-chart-wrap {
+        height: 110px;
+      }
+
+      .ma-box {
+        top: 12px;
+        left: 12px;
+        font-size: 11px;
+      }
     }
   </style>
 </head>
@@ -158,9 +229,15 @@
   </div>
 
   <div class="chart-card">
-    <div class="ma-box" id="maBox">読み込み中...</div>
-    <div class="message" id="message"></div>
-    <div id="chart"></div>
+    <div class="price-chart-wrap">
+      <div class="ma-box" id="maBox">読み込み中...</div>
+      <div class="message" id="message"></div>
+      <div id="priceChart"></div>
+    </div>
+
+    <div class="volume-chart-wrap">
+      <div id="volumeChart"></div>
+    </div>
   </div>
 
   <div class="footer">※ 投資クン内の学習用仮想チャートです</div>
@@ -174,7 +251,7 @@ const industry = params.get("industry") || "";
 const urlPrice = Number(params.get("price") || 0);
 
 const SUPABASE_URL = "https://ddtszhkycoqnffgciucl.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdHN6aGt5Y29xbmZmZ2NpdWNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMDExODQsImV4cCI6MjA2NDU3NzE4NH0.hASl_SDEf86hISajh9WQ0o5kVTuWZCV7IJ7y363cN9c";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhc2VhYmFzZSIsInJlZiI6ImRkdHN6aGt5Y29xbmZmZ2NpdWNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMDExODQsImV4cCI6MjA2NDU3NzE4NH0.hASl_SDEf86hISajh9WQ0o5kVTuWZCV7IJ7y363cN9c";
 
 const INDUSTRY_LABELS = {
   energy_infra: "エネルギー・インフラ",
@@ -191,7 +268,11 @@ const INDUSTRY_LABELS = {
 };
 
 let rawDailyData = [];
-let chart = null;
+
+let priceChart = null;
+let volumeChart = null;
+
+let isSyncingRange = false;
 
 document.getElementById("companyName").textContent = companyName || "企業名なし";
 document.getElementById("currentPrice").textContent =
@@ -333,21 +414,10 @@ function updateHeader(data) {
   changeEl.className = "change " + (diff >= 0 ? "up" : "down");
 }
 
-function render(mode) {
-  const data = aggregate(rawDailyData, mode);
-
-  updateHeader(data);
-
-  if (chart) {
-    chart.remove();
-    chart = null;
-  }
-
-  const chartEl = document.getElementById("chart");
-
-  chart = LightweightCharts.createChart(chartEl, {
-    width: chartEl.clientWidth,
-    height: 520,
+function getCommonChartOptions(width, height, showTimeScale) {
+  return {
+    width,
+    height,
     layout: {
       background: { color: "#ffffff" },
       textColor: "#111827"
@@ -366,14 +436,135 @@ function render(mode) {
       borderColor: "#ddd",
       timeVisible: false,
       rightOffset: 8,
-      barSpacing: mode === "day" ? 8 : mode === "week" ? 10 : 12
+      visible: showTimeScale
     },
     crosshair: {
       mode: LightweightCharts.CrosshairMode.Normal
+    },
+
+    /*
+      ここが今回の重要ポイント。
+
+      pressedMouseMove: true
+        PCやWebViewで横ドラッグ移動できる
+
+      horzTouchDrag: true
+        スマホで横スワイプして過去チャートを見られる
+
+      vertTouchDrag: false
+        縦方向のチャート操作は止める
+        アプリ全体の下スクロールを優先する
+
+      pinch: true
+        2本指ピンチだけ拡大縮小を許可する
+
+      mouseWheel: false
+        スクロールやホイールで勝手に拡大しないようにする
+    */
+    handleScroll: {
+      mouseWheel: false,
+      pressedMouseMove: true,
+      horzTouchDrag: true,
+      vertTouchDrag: false
+    },
+    handleScale: {
+      axisPressedMouseMove: false,
+      mouseWheel: false,
+      pinch: true
     }
+  };
+}
+
+function syncTimeScales() {
+  if (!priceChart || !volumeChart) return;
+
+  const priceTimeScale = priceChart.timeScale();
+  const volumeTimeScale = volumeChart.timeScale();
+
+  priceTimeScale.subscribeVisibleLogicalRangeChange(range => {
+    if (isSyncingRange || !range) return;
+
+    isSyncingRange = true;
+    volumeTimeScale.setVisibleLogicalRange(range);
+    isSyncingRange = false;
   });
 
-  const candleSeries = chart.addCandlestickSeries({
+  volumeTimeScale.subscribeVisibleLogicalRangeChange(range => {
+    if (isSyncingRange || !range) return;
+
+    isSyncingRange = true;
+    priceTimeScale.setVisibleLogicalRange(range);
+    isSyncingRange = false;
+  });
+}
+
+function render(mode) {
+  const data = aggregate(rawDailyData, mode);
+
+  updateHeader(data);
+
+  if (priceChart) {
+    priceChart.remove();
+    priceChart = null;
+  }
+
+  if (volumeChart) {
+    volumeChart.remove();
+    volumeChart = null;
+  }
+
+  const priceChartEl = document.getElementById("priceChart");
+  const volumeChartEl = document.getElementById("volumeChart");
+
+  const priceWrap = document.querySelector(".price-chart-wrap");
+  const volumeWrap = document.querySelector(".volume-chart-wrap");
+
+  const barSpacing = mode === "day" ? 8 : mode === "week" ? 10 : 12;
+
+  priceChart = LightweightCharts.createChart(
+    priceChartEl,
+    {
+      ...getCommonChartOptions(
+        priceChartEl.clientWidth,
+        priceWrap.clientHeight,
+        false
+      ),
+      timeScale: {
+        borderColor: "#ddd",
+        timeVisible: false,
+        rightOffset: 8,
+        barSpacing,
+        visible: false
+      }
+    }
+  );
+
+  volumeChart = LightweightCharts.createChart(
+    volumeChartEl,
+    {
+      ...getCommonChartOptions(
+        volumeChartEl.clientWidth,
+        volumeWrap.clientHeight,
+        true
+      ),
+      timeScale: {
+        borderColor: "#ddd",
+        timeVisible: false,
+        rightOffset: 8,
+        barSpacing,
+        visible: true
+      },
+      rightPriceScale: {
+        borderColor: "#ddd",
+        scaleMargins: {
+          top: 0.15,
+          bottom: 0.05
+        }
+      }
+    }
+  );
+
+  const candleSeries = priceChart.addCandlestickSeries({
     upColor: "#d93025",
     downColor: "#1a73e8",
     borderUpColor: "#d93025",
@@ -390,13 +581,9 @@ function render(mode) {
     close: d.close
   })));
 
-  const volumeSeries = chart.addHistogramSeries({
+  const volumeSeries = volumeChart.addHistogramSeries({
     priceFormat: { type: "volume" },
-    priceScaleId: "",
-    scaleMargins: {
-      top: 0.78,
-      bottom: 0
-    }
+    priceLineVisible: false
   });
 
   volumeSeries.setData(data.map(d => ({
@@ -416,7 +603,7 @@ function render(mode) {
   periods.forEach((p, i) => {
     const ma = movingAverage(data, p);
 
-    const s = chart.addLineSeries({
+    const s = priceChart.addLineSeries({
       color: colors[i],
       lineWidth: 2,
       priceLineVisible: false
@@ -431,15 +618,20 @@ function render(mode) {
       `${latest ? latest.toLocaleString("ja-JP") : "-"}<br>`;
   });
 
+  syncTimeScales();
+
   const visibleCount =
     mode === "day" ? 120 :
     mode === "week" ? 80 :
     48;
 
-  chart.timeScale().setVisibleLogicalRange({
+  const range = {
     from: Math.max(data.length - visibleCount, 0),
     to: data.length + 6
-  });
+  };
+
+  priceChart.timeScale().setVisibleLogicalRange(range);
+  volumeChart.timeScale().setVisibleLogicalRange(range);
 
   showMessage("");
 }
@@ -453,9 +645,22 @@ document.querySelectorAll(".tab").forEach(btn => {
 });
 
 window.addEventListener("resize", () => {
-  if (chart) {
-    chart.applyOptions({
-      width: document.getElementById("chart").clientWidth
+  const priceChartEl = document.getElementById("priceChart");
+  const volumeChartEl = document.getElementById("volumeChart");
+  const priceWrap = document.querySelector(".price-chart-wrap");
+  const volumeWrap = document.querySelector(".volume-chart-wrap");
+
+  if (priceChart) {
+    priceChart.applyOptions({
+      width: priceChartEl.clientWidth,
+      height: priceWrap.clientHeight
+    });
+  }
+
+  if (volumeChart) {
+    volumeChart.applyOptions({
+      width: volumeChartEl.clientWidth,
+      height: volumeWrap.clientHeight
     });
   }
 });
